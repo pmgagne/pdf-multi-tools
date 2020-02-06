@@ -33,14 +33,19 @@ class Application(ttk.Frame):
 
         self.params2 = self.create_input_file_widget(lf2)
 
-        self.hi_there = ttk.Button(lf1)
-        self.hi_there["text"] = "Hello World\n(click me)"
-        self.hi_there["command"] = self.say_hi
-        self.hi_there.pack(side="bottom")
+        lf3 = ttk.LabelFrame(self, text='Output:')
+        lf3.pack(side="top", expand=1, fill='x')
 
-        self.quit = ttk.Button(lf2, text="QUIT",
+        self.params3 = self.create_output_file_widget(lf3)
+
+        self.hi_there = ttk.Button(self)
+        self.hi_there["text"] = "Zip"
+        self.hi_there["command"] = self.zip_pdf
+        self.hi_there.pack(side="left")
+
+        self.quit = ttk.Button(self, text="Exit",
                               command=self.master.destroy)
-        self.quit.pack(side="bottom")
+        self.quit.pack(side="right")
 
     def create_input_file_widget(self, master):
         filename_var = tk.StringVar()
@@ -49,25 +54,56 @@ class Application(ttk.Frame):
             text="File", 
             textvariable=filename_var)
         filename.pack(side='left', expand=1, fill='x')
+        
         filename_chooser = ttk.Button(
             master, 
             text="\N{Horizontal Ellipsis}", # aka "..."
-            command=lambda:self.prompt_input_file(filename_var) )
+            command=lambda:self.prompt_for_input_file(filename_var) )
         filename_chooser.pack(side='right')
 
         params = {'path': filename_var}
         return params
 
-    def prompt_input_file(self, filename_var):
+    def create_output_file_widget(self, master):
+        filename_var = tk.StringVar()
+        filename = ttk.Entry(
+            master=master, 
+            text="File", 
+            textvariable=filename_var)
+        filename.pack(side='left', expand=1, fill='x')
+        
+        filename_chooser = ttk.Button(
+            master, 
+            text="\N{Horizontal Ellipsis}", # aka "..."
+            command=lambda:self.prompt_for_output_file(filename_var) )
+        filename_chooser.pack(side='right')
+
+        params = {'path': filename_var}
+        return params
+
+    def prompt_for_input_file(self, var):
         filename = tk.filedialog.askopenfilename(
-            title="file",
+            title='Input File',
             filetypes = (('PDF files', '*.pdf'), ('All Files', '*.*'))
         )
         if filename:
-            filename_var.set(filename)
+            var.set(filename)
             
-    def say_hi(self):
-        print("hi there, everyone!")
+    def prompt_for_output_file(self, var):
+        filename = tk.filedialog.asksaveasfilename(
+            title='Output File',
+            defaultextension='.pdf',
+            filetypes = (('PDF files', '*.pdf'),)
+        )
+        if filename:
+            var.set(filename)
+
+    def zip_pdf(self):
+        pdf_zip(self.params1['path'].get(),
+                self.params2['path'].get(),
+                self.params3['path'].get(),
+                delete=False,
+                revert=False)
 
 
 def process_arguments(args):
@@ -104,9 +140,8 @@ def process_arguments(args):
 
 
 if __name__ == "__main__":
-#    args = process_arguments(sys.argv[1:])
-#    pdf_zip(args.input1, args.input2, args.output, args.delete, args.revert)
-
     root = tk.Tk()
+    root.geometry("500x250")
+    root.wm_resizable(0,0)
     app = Application(master=root)
     app.mainloop()
