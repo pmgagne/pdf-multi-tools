@@ -1,0 +1,3 @@
+[submodule "pdftools"]
+	path = pdftools
+	url = https://github.com/pmgagne/pdftools.git
