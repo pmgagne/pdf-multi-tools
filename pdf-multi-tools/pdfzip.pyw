@@ -19,67 +19,95 @@ class Application(ttk.Frame):
         self.pack(expand=1, fill='both')
         self.master.title('pdfzip')
         self.create_widgets()
-        ttk.Sizegrip().pack(side='right')
+        
+        # Not resizeable.
+        #ttk.Sizegrip().pack(side='right')
 
     def create_widgets(self):
 
-        lf1 = ttk.LabelFrame(self, text='File 1:')
-        lf1.pack(side="top", expand=1, fill='x')
+        # Input file 1
+        lf1 = ttk.LabelFrame(self, text='File 1:', padding=(12,6))
+        lf1.grid(row=0, column=0, sticky=tk.EW, padx=6, pady=12)
+        lf1.grid_columnconfigure(0, minsize=100, weight=1)
 
-        self.params1 = self.create_input_file_widget(lf1)
-
-        lf2 = ttk.LabelFrame(self, text='File 2:')
-        lf2.pack(side="top", expand=1, fill='x')
-
-        self.params2 = self.create_input_file_widget(lf2)
-
-        lf3 = ttk.LabelFrame(self, text='Output:')
-        lf3.pack(side="top", expand=1, fill='x')
-
-        self.params3 = self.create_output_file_widget(lf3)
-
-        self.hi_there = ttk.Button(self)
-        self.hi_there["text"] = "Zip"
-        self.hi_there["command"] = self.zip_pdf
-        self.hi_there.pack(side="left")
-
-        self.quit = ttk.Button(self, text="Exit",
-                              command=self.master.destroy)
-        self.quit.pack(side="right")
-
-    def create_input_file_widget(self, master):
-        filename_var = tk.StringVar()
+        self.input1_filename = tk.StringVar()
         filename = ttk.Entry(
-            master=master, 
-            text="File", 
-            textvariable=filename_var)
-        filename.pack(side='left', expand=1, fill='x')
+            master=lf1, 
+            text="Input File 1", 
+            textvariable=self.input1_filename)
+        filename.grid(row=0, column=0, sticky=tk.EW)
         
         filename_chooser = ttk.Button(
-            master, 
+            master=lf1, 
             text="\N{Horizontal Ellipsis}", # aka "..."
-            command=lambda:self.prompt_for_input_file(filename_var) )
-        filename_chooser.pack(side='right')
+            command=lambda:self.prompt_for_input_file(self.input1_filename) )
+        filename_chooser.grid(row=0, column=1)
 
-        params = {'path': filename_var}
-        return params
+        # Input file 2
+        lf2 = ttk.LabelFrame(self, text='File 2:', padding=(12,6))
+        lf2.grid(row=1, column=0, sticky=tk.EW, padx=6, pady=6)
+        lf2.grid_columnconfigure(0, minsize=100, weight=1)
 
-    def create_output_file_widget(self, master):
-        filename_var = tk.StringVar()
+        self.input2_filename = tk.StringVar()
         filename = ttk.Entry(
-            master=master, 
-            text="File", 
-            textvariable=filename_var)
-        filename.pack(side='left', expand=1, fill='x')
+            master=lf2, 
+            text="Input File 2", 
+            textvariable=self.input2_filename)
+        filename.grid(row=0, column=0, sticky=tk.EW)
         
         filename_chooser = ttk.Button(
-            master, 
+            master=lf2, 
             text="\N{Horizontal Ellipsis}", # aka "..."
-            command=lambda:self.prompt_for_output_file(filename_var) )
-        filename_chooser.pack(side='right')
+            command=lambda:self.prompt_for_input_file(self.input2_filename) )
+        filename_chooser.grid(row=0, column=1)
 
-        params = {'path': filename_var}
-        return params
+        self.input2_reverse = tk.IntVar()
+        self.input2_reverse.set(1)
+        input2_reverse = ttk.Checkbutton(
+            master=lf2, 
+            text="Reverse", 
+            variable=self.input2_reverse)
+        input2_reverse.grid(row=1, column=0, sticky=tk.W)
+
+        # Output file
+        lf3 = ttk.LabelFrame(self, text='Output:', padding=(12,6))
+        lf3.grid(row=2, column=0, sticky=tk.EW, padx=6, pady=6)
+        lf3.grid_columnconfigure(0, minsize=100, weight=1)
+
+        self.output_filename = tk.StringVar()
+        filename = ttk.Entry(
+            master=lf3, 
+            text="Output file", 
+            textvariable=self.output_filename)
+        filename.grid(row=0, column=0, sticky=tk.EW)
+        
+        filename_chooser = ttk.Button(
+            master=lf3, 
+            text="\N{Horizontal Ellipsis}", # aka "..."
+            command=lambda:self.prompt_for_output_file(self.output_filename) )
+        filename_chooser.grid(row=0, column=1)
+
+        lf4 = ttk.Frame(self)
+        lf4.grid(row=3, column=0, sticky=tk.S+tk.EW, padx=12, pady=12)
+        lf4.columnconfigure(6, weight=1)
+        
+        self.combine_btn = ttk.Button(
+            master=lf4,
+            text='Zip',
+            command=self.zip_pdf)
+        self.combine_btn.grid(row=0, column=0, sticky=tk.S)
+
+        self.quit_btn = ttk.Button(
+            lf4,
+            text="Exit",
+            command=self.master.destroy)
+        self.quit_btn.grid(row=0, column=6, sticky=tk.SE)
+
+        # Container grid final adjustments
+        self.grid_columnconfigure(0, weight=1)
+        # We make this last row resizeable to accomodate the layout.
+        self.rowconfigure(3, weight=1)
+
 
     def prompt_for_input_file(self, var):
         filename = tk.filedialog.askopenfilename(
@@ -99,11 +127,11 @@ class Application(ttk.Frame):
             var.set(filename)
 
     def zip_pdf(self):
-        pdf_zip(self.params1['path'].get(),
-                self.params2['path'].get(),
-                self.params3['path'].get(),
+        pdf_zip(self.input1_filename.get(),
+                self.input2_filename.get(),
+                self.output_filename.get(),
                 delete=False,
-                revert=False)
+                revert=self.input2_reverse.get() != 0)
 
 
 def process_arguments(args):
@@ -141,7 +169,7 @@ def process_arguments(args):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    root.geometry("500x250")
+    root.geometry("500x300")
     root.wm_resizable(0,0)
     app = Application(master=root)
     app.mainloop()
