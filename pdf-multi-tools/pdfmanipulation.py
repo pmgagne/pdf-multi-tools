@@ -27,14 +27,16 @@ def pdf_recto_verso(
         f1, f2 = open(input1, "rb"), open(input2, "rb")
         r1, r2 = PdfFileReader(f1), PdfFileReader(f2)
         writer = PdfFileWriter()
-        pages1 = [page for page in r1.pages]
-        pages2 = [page for page in r2.pages]
 
         if reverse1:
-            pages1 = reversed(pages1)
+            pages1 = reversed(r1.pages)
+        else:
+            pages1 = r1.pages
 
         if reverse2:
-            pages2 = reversed(pages2)
+            pages2 = reversed(r2.pages)
+        else:
+            pages2 = r2.pages
 
         for p1, p2 in zip(pages1, pages2):
             writer.addPage(p1)
@@ -52,7 +54,7 @@ def pdf_recto_verso(
 def pdf_append(
     input1: str,
     output: str,
-    reverse1: bool = False,
+    reverse: bool = False,
     append: bool = True
 ):
     """
@@ -65,18 +67,18 @@ def pdf_append(
 
     """
 
-    outputfile = tempfile.TemporaryFile()
+    outputfile = tempfile.NamedTemporaryFile()
     try:
         f1, f2 = open(input1, "rb"), open(output, "rb"),
         r1, r2 = PdfFileReader(f1), PdfFileReader(f2)
         writer = PdfFileWriter()
 
-        # TODO: pages1 = r1.pages ?
-        pages1 = [page for page in r1.pages]
-        pages2 = [page for page in r2.pages]
+        if reverse:
+            pages1 = reversed(r1.pages)
+        else:
+            pages1 = r1.pages
 
-        if reverse1:
-            pages1 = reversed(pages1)
+        pages2 = r2.pages
 
         if append:
             for p2 in pages2:
@@ -96,7 +98,10 @@ def pdf_append(
         f1.close()
         f2.close()
         
-        shutil.copy2(outputfile, output)
+        outputfile.seek(0)        
+        f2 = open(output, "wb")
+        shutil.copyfileobj(outputfile, f2)
+        f2.close()
 
     except FileNotFoundError as e:
         print(e.strerror + ": " + e.filename)

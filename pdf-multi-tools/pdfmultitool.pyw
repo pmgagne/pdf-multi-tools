@@ -1,25 +1,24 @@
 #!/usr/bin/env python
 
-# Based upon https://github.com/stlehmann/pdftools/blob/master/pdfzip.py
-
-
 import sys
 import argparse
-from pdftools import pdf_zip
-from pdftools.parseutil import parentparser
 
 import tkinter as tk
 from tkinter import ttk
 import tkinter.filedialog
+
+import pdfmanipulation
+import tkhelpers
 
 class Application(ttk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
         self.master = master
         self.pack(expand=1, fill='both')
-        self.master.title('pdfzip')
+        self.master.title('pdf multi tool')
         self.create_widgets()
         
+        self.gui_update()
         # Not resizeable.
         #ttk.Sizegrip().pack(side='right')
 
@@ -43,10 +42,19 @@ class Application(ttk.Frame):
             command=lambda:self.prompt_for_input_file(self.input1_filename) )
         filename_chooser.grid(row=0, column=1)
 
+        self.input1_reverse = tk.IntVar()
+        self.input1_reverse.set(0)
+        input1_reverse = ttk.Checkbutton(
+            master=lf1, 
+            text="Reverse", 
+            variable=self.input1_reverse)
+        input1_reverse.grid(row=1, column=0, sticky=tk.W)
+
         # Input file 2
         lf2 = ttk.LabelFrame(self, text='File 2:', padding=(12,6))
         lf2.grid(row=1, column=0, sticky=tk.EW, padx=6, pady=6)
         lf2.grid_columnconfigure(0, minsize=100, weight=1)
+        self.lf2 = lf2
 
         self.input2_filename = tk.StringVar()
         filename = ttk.Entry(
@@ -87,14 +95,37 @@ class Application(ttk.Frame):
             command=lambda:self.prompt_for_output_file(self.output_filename) )
         filename_chooser.grid(row=0, column=1)
 
+        self.mode = tk.IntVar()
+        lf3_buttons = ttk.LabelFrame(lf3, text="Mode:", padding=(12,6))
+        lf3_buttons.grid(row=1, column=0)
+        
+        ttk.Radiobutton(
+            lf3_buttons, 
+            text='Recto/Verso', 
+            variable=self.mode, 
+            value = 0,
+            command=self.gui_update).grid(row=0,column=0)
+        ttk.Radiobutton(
+            lf3_buttons, 
+            text='Append',
+            variable=self.mode,
+            value = 1,
+            command=self.gui_update).grid(row=0,column=1)
+        ttk.Radiobutton(
+            lf3_buttons, 
+            text='Prepend', 
+            variable=self.mode, 
+            value = 2,
+            command=self.gui_update).grid(row=0,column=2)
+
         lf4 = ttk.Frame(self)
         lf4.grid(row=3, column=0, sticky=tk.S+tk.EW, padx=12, pady=12)
         lf4.columnconfigure(6, weight=1)
         
         self.combine_btn = ttk.Button(
             master=lf4,
-            text='Zip',
-            command=self.zip_pdf)
+            text='Process',
+            command=self.process_pdf)
         self.combine_btn.grid(row=0, column=0, sticky=tk.S)
 
         self.quit_btn = ttk.Button(
@@ -108,6 +139,11 @@ class Application(ttk.Frame):
         # We make this last row resizeable to accomodate the layout.
         self.rowconfigure(3, weight=1)
 
+    def gui_update(self):
+        if self.mode.get() in [1, 2]:
+            tkhelpers.widget_recursive_enabler(self.lf2, False)
+        else:
+            tkhelpers.widget_recursive_enabler(self.lf2, True)
 
     def prompt_for_input_file(self, var):
         filename = tk.filedialog.askopenfilename(
@@ -126,13 +162,21 @@ class Application(ttk.Frame):
         if filename:
             var.set(filename)
 
-    def zip_pdf(self):
-        pdf_zip(self.input1_filename.get(),
+    def process_pdf(self):
+        if self.mode.get() == 0:
+            pdfmanipulation.pdf_recto_verso(
+                self.input1_filename.get(),
                 self.input2_filename.get(),
                 self.output_filename.get(),
-                delete=False,
-                revert=self.input2_reverse.get() != 0)
-
+                reverse1=self.input1_reverse.get() != 0,
+                reverse2=self.input2_reverse.get() != 0)
+        elif self.mode.get() in [1, 2]:
+            pdfmanipulation.pdf_append(
+                self.input1_filename.get(),
+                self.output_filename.get(),
+                reverse=self.input1_reverse.get() != 0,
+                append=self.mode.get()==1)
+            
 
 def process_arguments(args):
     parser = argparse.ArgumentParser(
@@ -169,7 +213,7 @@ def process_arguments(args):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    root.geometry("500x300")
+    root.geometry("500x400")
     root.wm_resizable(0,0)
     app = Application(master=root)
     app.mainloop()
