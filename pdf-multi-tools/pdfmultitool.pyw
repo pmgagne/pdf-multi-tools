@@ -64,13 +64,16 @@ class Application(ttk.Frame):
 
     def gui_mode_switch(self, previous_mode:str, next_mode:str):
         """Set widget state based on active parameters"""
+
         if previous_mode and previous_mode != next_mode:
             # Save previous mode params
             self.parameters[previous_mode]['input1_reverse'] = self.input1_reverse.get()!=0
             self.parameters[previous_mode]['input2_reverse'] = self.input2_reverse.get()!=0
+            self.parameters['general']['confirm'] = self.confirm_output.get()
 
         self.input1_reverse.set(self.parameters[next_mode]['input1_reverse'])
         self.input2_reverse.set(self.parameters[next_mode]['input2_reverse'])
+        self.confirm_output.set(self.parameters['general']['confirm'])
 
         self.mode = next_mode
 
@@ -129,7 +132,7 @@ class Application(ttk.Frame):
         lf3.grid_columnconfigure(0, minsize=100, weight=1)
 
         lf3_buttons = ttk.LabelFrame(lf3, text="Mode:", padding=(12,6))
-        lf3_buttons.grid(row=1, column=0)
+        lf3_buttons.grid(row=1, column=0, sticky=tk.W)
         
         ttk.Radiobutton(
             lf3_buttons, 
@@ -153,7 +156,7 @@ class Application(ttk.Frame):
         ttk.Checkbutton(
             lf3,
             text="Confirm Result", 
-            variable=self.confirm_output).grid(row=1, column=1, sticky=tk.W)
+            variable=self.confirm_output).grid(row=2, column=0, sticky=tk.W)
 
         lf4 = ttk.Frame(self)
         lf4.grid(row=3, column=0, sticky=tk.S+tk.EW, padx=12, pady=12)
@@ -243,7 +246,7 @@ class Application(ttk.Frame):
                 reverse1=self.input1_reverse.get() != 0,
                 reverse2=self.input2_reverse.get() != 0)
 
-        elif self.mode.get() in ('append', 'prepend'):
+        elif self.mode in ('append', 'prepend'):
             pdfmanipulation.pdf_append(
                 self.input1_filename.get(),
                 self.input2_filename.get(),
@@ -251,6 +254,9 @@ class Application(ttk.Frame):
                 reverse1=self.input1_reverse.get() != 0,
                 reverse2=self.input2_reverse.get() != 0,
                 append=self.mode=='append')
+
+        else:
+            assert(False)
 
         self.last_outputfile = output_filename
         if self.confirm_output.get():
@@ -261,7 +267,7 @@ def report_callback_exception(self, exc, val, tb):
 
 if __name__ == "__main__":
     root = tk.Tk()
-    root.geometry("500x350")
+    root.geometry("500x400")
     root.wm_resizable(0,0)
 
     #tk.Tk.report_callback_exception = report_callback_exception
