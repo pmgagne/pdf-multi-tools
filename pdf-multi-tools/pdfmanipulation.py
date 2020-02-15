@@ -55,7 +55,8 @@ def pdf_append(
     input1: str,
     input2: str,
     output: str,
-    reverse: bool = False,
+    reverse1: bool = False,
+    reverse2: bool = False,
     append: bool = True):
     """
     Append or prepend input1 pages to input2, then save to output.
@@ -72,25 +73,28 @@ def pdf_append(
     r1, r2 = PdfFileReader(f1), PdfFileReader(f2)
     writer = PdfFileWriter()
 
-    if reverse:
+    if reverse1:
         pages1 = reversed(r1.pages)
     else:
         pages1 = r1.pages
 
-    pages2 = r2.pages
+    if reverse2:
+        pages2 = reversed(r2.pages)
+    else:
+        pages2 = r2.pages
 
     if append:
-        for p2 in pages2:
-            writer.addPage(p2)
-
         for p1 in pages1:
             writer.addPage(p1)
+
+        for p2 in pages2:
+            writer.addPage(p2)
     else:
-        for p1 in pages1:
-            writer.addPage(p1)
-
         for p2 in pages2:
             writer.addPage(p2)
+
+        for p1 in pages1:
+            writer.addPage(p1)
 
     writer.write(outputfile)
 

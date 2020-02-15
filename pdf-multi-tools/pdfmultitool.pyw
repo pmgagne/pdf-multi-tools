@@ -1,17 +1,21 @@
 #!/usr/bin/env python
 
-import sys
+import sys, os, subprocess
 import os.path
 
 import tkinter as tk
 from tkinter import ttk
 import tkinter.filedialog
-from tkinter.messagebox import showerror
+import tkinter.messagebox
 
+import bidict
 import pdfmanipulation
 import tkhelpers
 
+
 class Application(ttk.Frame):
+    mode_defs = bidict.Bidict({int(0): 'zip', int(1): 'append', int(2): 'prepend'})
+
     def __init__(self, master=None):
         super().__init__(master)
         self.pack(expand=1, fill='both')
@@ -19,24 +23,56 @@ class Application(ttk.Frame):
         
         # Not resizeable.
         #ttk.Sizegrip().pack(side='right')
-        
+
+        # Each mode has a different set of parameters.
+        self.parameters = self.create_parameters()
+
         self.last_inputfile1 = ""
         self.last_inputfile2 = ""
         self.last_outputfile = ""
 
         self.input1_filename = tk.StringVar()
         self.input1_reverse = tk.IntVar()
-        self.input1_reverse.set(0)
 
         self.input2_filename = tk.StringVar()
         self.input2_reverse = tk.IntVar()
-        self.input2_reverse.set(1)
 
-        self.mode = tk.IntVar()
-        self.mode.set(0)
+        self.mode = 'zip'
+        self.mode_selection = tk.IntVar()
+        self.mode_selection.set(self.mode_defs.inverse[self.mode][0])
+        self.confirm_output = tk.IntVar()
 
         self.create_widgets()        
+        self.gui_mode_switch(previous_mode="", next_mode='zip')
         self.after_idle(self.gui_update)
+
+    def create_parameters(self):
+        parameters = {'general': {}, 'zip':{}, 'append':{}, 'prepend':{}}
+
+        parameters['general']['confirm'] = True
+        
+        parameters['zip']['input1_reverse'] = False
+        parameters['zip']['input2_reverse'] = True
+
+        parameters['append']['input1_reverse'] = False
+        parameters['append']['input2_reverse'] = False
+
+        parameters['prepend']['input1_reverse'] = False
+        parameters['prepend']['input2_reverse'] = False
+
+        return parameters
+
+    def gui_mode_switch(self, previous_mode:str, next_mode:str):
+        """Set widget state based on active parameters"""
+        if previous_mode and previous_mode != next_mode:
+            # Save previous mode params
+            self.parameters[previous_mode]['input1_reverse'] = self.input1_reverse.get()!=0
+            self.parameters[previous_mode]['input2_reverse'] = self.input2_reverse.get()!=0
+
+        self.input1_reverse.set(self.parameters[next_mode]['input1_reverse'])
+        self.input2_reverse.set(self.parameters[next_mode]['input2_reverse'])
+
+        self.mode = next_mode
 
     def create_widgets(self):
 
@@ -98,21 +134,26 @@ class Application(ttk.Frame):
         ttk.Radiobutton(
             lf3_buttons, 
             text='Recto/Verso', 
-            variable=self.mode, 
+            variable=self.mode_selection, 
             value = 0,
             command=self.gui_update).grid(row=0,column=0)
         ttk.Radiobutton(
             lf3_buttons, 
             text='Append',
-            variable=self.mode,
+            variable=self.mode_selection,
             value = 1,
             command=self.gui_update).grid(row=0,column=1)
         ttk.Radiobutton(
             lf3_buttons, 
             text='Prepend', 
-            variable=self.mode, 
+            variable=self.mode_selection, 
             value = 2,
             command=self.gui_update).grid(row=0,column=2)
+
+        ttk.Checkbutton(
+            lf3,
+            text="Confirm Result", 
+            variable=self.confirm_output).grid(row=1, column=1, sticky=tk.W)
 
         lf4 = ttk.Frame(self)
         lf4.grid(row=3, column=0, sticky=tk.S+tk.EW, padx=12, pady=12)
@@ -136,6 +177,11 @@ class Application(ttk.Frame):
         self.rowconfigure(3, weight=1)
 
     def gui_update(self):
+        previous_mode = self.mode
+        next_mode = self.mode_defs[self.mode_selection.get()]
+
+        self.gui_mode_switch(previous_mode=previous_mode, next_mode=next_mode)
+
         if self.input1_filename.get() and self.input2_filename.get():
             tkhelpers.widget_recursive_enabler(self.combine_btn, True)
         else:
@@ -175,12 +221,21 @@ class Application(ttk.Frame):
 
         return filename
 
+    def confirm_result(self, filepath):
+        result = tkinter.messagebox.askyesno(
+            "Result",
+            "Successfully Done.\n"
+            "Do you want to open the resulting file?""")
+
+        if result:
+            subprocess.call(('cmd /c start "" "'+ filepath +'"') if os.name is 'nt' else ('open' if sys.platform.startswith('darwin') else 'xdg-open', filepath))
+
     def process_pdf(self):
         output_filename = self.prompt_for_output_file()
         if not output_filename:
             return
 
-        if self.mode.get() == 0:
+        if self.mode == 'zip':
             pdfmanipulation.pdf_recto_verso(
                 self.input1_filename.get(),
                 self.input2_filename.get(),
@@ -188,25 +243,28 @@ class Application(ttk.Frame):
                 reverse1=self.input1_reverse.get() != 0,
                 reverse2=self.input2_reverse.get() != 0)
 
-        elif self.mode.get() in [1, 2]:
+        elif self.mode.get() in ('append', 'prepend'):
             pdfmanipulation.pdf_append(
                 self.input1_filename.get(),
                 self.input2_filename.get(),
                 output_filename,
-                reverse=self.input1_reverse.get() != 0,
-                append=self.mode.get()==1)
+                reverse1=self.input1_reverse.get() != 0,
+                reverse2=self.input2_reverse.get() != 0,
+                append=self.mode=='append')
 
         self.last_outputfile = output_filename
+        if self.confirm_output.get():
+            self.confirm_result(filepath=output_filename)
 
 def report_callback_exception(self, exc, val, tb):
-    showerror("Error", message=str(val))
+    tkinter.messagebox.showerror("Error", message=str(val))
 
 if __name__ == "__main__":
     root = tk.Tk()
     root.geometry("500x350")
     root.wm_resizable(0,0)
 
-    tk.Tk.report_callback_exception = report_callback_exception
+    #tk.Tk.report_callback_exception = report_callback_exception
 
     app = Application(master=root)
     app.mainloop()
