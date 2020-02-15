@@ -14,13 +14,15 @@ import tkhelpers
 class Application(ttk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
-        self.master = master
         self.pack(expand=1, fill='both')
         self.master.title('pdf multi tool')
         
-        self.last_inputfile1 = None
-        self.last_inputfile2 = None
-        self.last_outputfile = None
+        # Not resizeable.
+        #ttk.Sizegrip().pack(side='right')
+        
+        self.last_inputfile1 = ""
+        self.last_inputfile2 = ""
+        self.last_outputfile = ""
 
         self.input1_filename = tk.StringVar()
         self.input1_reverse = tk.IntVar()
@@ -30,14 +32,11 @@ class Application(ttk.Frame):
         self.input2_reverse = tk.IntVar()
         self.input2_reverse.set(1)
 
-        self.output_filename = None
         self.mode = tk.IntVar()
         self.mode.set(0)
 
-        self.create_widgets()
-        self.gui_update()
-        # Not resizeable.
-        #ttk.Sizegrip().pack(side='right')
+        self.create_widgets()        
+        self.after_idle(self.gui_update)
 
     def create_widgets(self):
 
@@ -149,22 +148,24 @@ class Application(ttk.Frame):
         initial_file=os.path.basename(initial_filepath)
 
         filename = tk.filedialog.askopenfilename(
+            master=self,
             title='Input File',
             filetypes = (('PDF files', '*.pdf'), ('All Files', '*.*')),
             initialdir=initial_dir,
             initialfile=initial_file
         )
+
         if filename:
             var.set(filename)
         
         self.after_idle(self.gui_update)
 
-    def process_pdf(self):
+    def prompt_for_output_file(self):
 
-        initial_dir=os.path.dirname(self.output_filename)
-        initial_file=os.path.basename(self.output_filename)
+        initial_dir=os.path.dirname(self.last_outputfile)
+        initial_file=os.path.basename(self.last_outputfile)
 
-        temp_output_filename = tk.filedialog.asksaveasfilename(
+        filename = tk.filedialog.asksaveasfilename(
             title='Output File',
             defaultextension='.pdf',
             filetypes = (('PDF files', '*.pdf'),),
@@ -172,16 +173,18 @@ class Application(ttk.Frame):
             initialfile=initial_file
         )
 
-        if not temp_output_filename:
-            return
+        return filename
 
-        self.output_filename = temp_output_filename
+    def process_pdf(self):
+        output_filename = self.prompt_for_output_file()
+        if not output_filename:
+            return
 
         if self.mode.get() == 0:
             pdfmanipulation.pdf_recto_verso(
                 self.input1_filename.get(),
                 self.input2_filename.get(),
-                self.output_filename,
+                output_filename,
                 reverse1=self.input1_reverse.get() != 0,
                 reverse2=self.input2_reverse.get() != 0)
 
@@ -189,10 +192,11 @@ class Application(ttk.Frame):
             pdfmanipulation.pdf_append(
                 self.input1_filename.get(),
                 self.input2_filename.get(),
-                self.output_filename,
+                output_filename,
                 reverse=self.input1_reverse.get() != 0,
                 append=self.mode.get()==1)
 
+        self.last_outputfile = output_filename
 
 def report_callback_exception(self, exc, val, tb):
     showerror("Error", message=str(val))
