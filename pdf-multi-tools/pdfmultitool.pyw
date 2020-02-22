@@ -11,7 +11,7 @@ import tkinter.messagebox
 import bidict
 import pdfmanipulation
 import tkhelpers
-
+import tkinterdnd2
 
 class Application(ttk.Frame):
     mode_defs = bidict.Bidict({int(0): 'zip', int(1): 'append', int(2): 'prepend'})
@@ -42,7 +42,7 @@ class Application(ttk.Frame):
         self.mode_selection.set(self.mode_defs.inverse[self.mode][0])
         self.confirm_output = tk.IntVar()
 
-        self.create_widgets()        
+        self.create_widgets()  
         self.gui_mode_switch(previous_mode="", next_mode='zip')
         self.after_idle(self.gui_update)
 
@@ -89,7 +89,9 @@ class Application(ttk.Frame):
             text="Input File 1", 
             textvariable=self.input1_filename)
         filename.grid(row=0, column=0, sticky=tk.EW)
-        
+        filename.drop_target_register(tkinterdnd2.DND_FILES, tkinterdnd2.DND_TEXT)
+        filename.dnd_bind('<<Drop>>', lambda event: self.drop(event, self.input1_filename))
+
         filename_chooser = ttk.Button(
             master=lf1, 
             text="\N{Horizontal Ellipsis}", # aka "..."
@@ -113,6 +115,8 @@ class Application(ttk.Frame):
             text="Input File 2", 
             textvariable=self.input2_filename)
         filename.grid(row=0, column=0, sticky=tk.EW)
+        filename.drop_target_register(tkinterdnd2.DND_FILES, tkinterdnd2.DND_TEXT)
+        filename.dnd_bind('<<Drop>>', lambda event: self.drop(event, self.input2_filename))
         
         filename_chooser = ttk.Button(
             master=lf2, 
@@ -178,6 +182,20 @@ class Application(ttk.Frame):
         self.grid_columnconfigure(0, weight=1)
         # We make this last row resizeable to accomodate the layout.
         self.rowconfigure(3, weight=1)
+
+    def drop(self, event, variable):
+        if event.data:
+            # event.data is a list of filenames as one string;
+            # if one of these filenames contains whitespace characters
+            # it is rather difficult to reliably tell where one filename
+            # ends and the next begins; the best bet appears to be
+            # to count on tkdnd's and tkinter's internal magic to handle
+            # such cases correctly; the following seems to work well
+            # at least with Windows and Gtk/X11
+            files = self.tk.splitlist(event.data)
+            variable.set(files[0])
+            self.after_idle(self.gui_update)
+        return event.action
 
     def gui_update(self):
         previous_mode = self.mode
@@ -266,7 +284,7 @@ def report_callback_exception(self, exc, val, tb):
     tkinter.messagebox.showerror("Error", message=str(val))
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = tkinterdnd2.Tk()
     root.geometry("500x400")
     root.wm_resizable(0,0)
 
