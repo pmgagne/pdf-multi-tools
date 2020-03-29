@@ -256,9 +256,9 @@ class Application(ttk.Frame):
         
         self.after_idle(self.gui_update)
 
-    def prompt_for_output_path(self, output_is_dir=False):
-        initial_dir=os.path.dirname(self.last_outputfile)
-        initial_file=os.path.basename(self.last_outputfile)
+    def prompt_for_output_path(self, output_is_dir=False, initial_path=None):
+        initial_dir=os.path.dirname(initial_path)
+        initial_file=os.path.basename(initial_path)
 
         if not output_is_dir:
             output_path = tk.filedialog.asksaveasfilename(
@@ -289,7 +289,7 @@ class Application(ttk.Frame):
         output_path = ""
         
         if self.mode == 'zip':
-            output_path = self.prompt_for_output_path()
+            output_path = self.prompt_for_output_path(initial_path=self.last_outputfile)
             if not output_path:
                 return
 
@@ -301,7 +301,8 @@ class Application(ttk.Frame):
                 reverse2=self.input2_reverse.get() != 0)
 
         elif self.mode in ('append', 'prepend'):
-            output_path = self.prompt_for_output_path()
+            output_path = self.prompt_for_output_path(
+                initial_path=self.last_outputfile)
             if not output_path:
                 return
 
@@ -314,7 +315,10 @@ class Application(ttk.Frame):
                 append=self.mode=='append')
 
         elif self.mode == 'split':
-            output_path = self.prompt_for_output_path(output_is_dir=True)
+            output_path = self.prompt_for_output_path(
+                output_is_dir=True,
+                initial_path=self.input1_filename.get())
+
             if not output_path:
                 return
 
@@ -339,8 +343,12 @@ class Application(ttk.Frame):
         else:
             assert(False)
 
-        # Offer to open the result file or directory
-        self.last_outputfile = output_path
+        # Memorise last output file path to serve as initial path next time,
+        # except for split mode. 
+        if self.mode != 'split':
+            self.last_outputfile = output_path
+
+        # Offer to open the resulting file or directory
         if self.confirm_output.get():
             self.confirm_result(filepath=output_path)
 
