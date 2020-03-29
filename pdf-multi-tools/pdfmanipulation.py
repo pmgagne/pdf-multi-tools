@@ -106,4 +106,47 @@ def pdf_append(
     shutil.copyfileobj(outputfile, f2)
     f2.close()
 
-        
+
+def pdf_split(
+    input: str,
+    output_dir: str,
+    reverse: bool = False,
+    dry_run=False
+):
+    """
+    Split the input file in multiple output files.
+    pdf_split will overwrite pre-existing files.
+
+    :param input: name of the input file
+    :param output_dir: output directory
+    :param reverse:  reverse page order of input if True
+    :param dry_run: if true, don't actually write output files.
+    :return list of output file 
+    """
+
+    output_paths = []
+    with open(input, "rb") as inputfile:
+        reader = PdfFileReader(inputfile)
+        page_count = len(reader.pages)
+
+    filename_prefix = os.path.splitext(os.path.basename(input))[0]
+    output_prefix = os.path.join(output_dir, filename_prefix)
+    output_paths = ["{}_{:03d}.pdf".format(output_prefix, page+1) for page in range(page_count)]
+
+    if not dry_run:
+        with open(input, "rb") as inputfile:
+            reader = PdfFileReader(inputfile)
+
+            if reverse:
+                pages = reversed(reader.pages)
+            else:
+                pages = reader.pages
+
+            for page, output in zip(pages, output_paths):
+                outputfile = open(output, "wb")
+                writer = PdfFileWriter()
+                writer.addPage(page)
+                writer.write(outputfile)
+                outputfile.close()
+
+    return output_paths

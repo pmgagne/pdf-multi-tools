@@ -13,8 +13,15 @@ import pdfmanipulation
 import tkhelpers
 import tkinterdnd2
 
+def is_files_exists(files):
+    """Return True if at least one file (in files) already exists."""
+    for file in files:
+        if os.path.isfile(file):
+            return True
+    return False
+
 class Application(ttk.Frame):
-    mode_defs = bidict.Bidict({int(0): 'zip', int(1): 'append', int(2): 'prepend'})
+    mode_defs = bidict.Bidict({int(0): 'zip', int(1): 'append', int(2): 'prepend', int(3): 'split'})
 
     def __init__(self, master=None):
         super().__init__(master)
@@ -47,7 +54,7 @@ class Application(ttk.Frame):
         self.after_idle(self.gui_update)
 
     def create_parameters(self):
-        parameters = {'general': {}, 'zip':{}, 'append':{}, 'prepend':{}}
+        parameters = {'general': {}, 'zip':{}, 'append':{}, 'prepend':{}, 'split':{}}
 
         parameters['general']['confirm'] = True
         
@@ -59,6 +66,9 @@ class Application(ttk.Frame):
 
         parameters['prepend']['input1_reverse'] = False
         parameters['prepend']['input2_reverse'] = False
+
+        parameters['split']['input1_reverse'] = False
+        parameters['split']['input2_reverse'] = False
 
         return parameters
 
@@ -80,12 +90,12 @@ class Application(ttk.Frame):
     def create_widgets(self):
 
         # Input file 1
-        lf1 = ttk.LabelFrame(self, text='File 1:', padding=(12,6))
-        lf1.grid(row=0, column=0, sticky=tk.EW, padx=6, pady=12)
-        lf1.grid_columnconfigure(0, minsize=100, weight=1)
+        self.lf1 = ttk.LabelFrame(self, text='File 1:', padding=(12,6))
+        self.lf1.grid(row=0, column=0, sticky=tk.EW, padx=6, pady=12)
+        self.lf1.grid_columnconfigure(0, minsize=100, weight=1)
 
         filename = ttk.Entry(
-            master=lf1, 
+            master=self.lf1, 
             text="Input File 1", 
             textvariable=self.input1_filename)
         filename.grid(row=0, column=0, sticky=tk.EW)
@@ -93,25 +103,25 @@ class Application(ttk.Frame):
         filename.dnd_bind('<<Drop>>', lambda event: self.drop(event, self.input1_filename))
 
         filename_chooser = ttk.Button(
-            master=lf1, 
+            master=self.lf1, 
             text="\N{Horizontal Ellipsis}", # aka "..."
             command=lambda:self.prompt_for_input_file(self.input1_filename) )
         filename_chooser.grid(row=0, column=1)
 
         input1_reverse = ttk.Checkbutton(
-            master=lf1, 
+            master=self.lf1, 
             text="Reverse", 
             variable=self.input1_reverse)
         input1_reverse.grid(row=1, column=0, sticky=tk.W)
 
         # Input file 2
-        lf2 = ttk.LabelFrame(self, text='File 2:', padding=(12,6))
-        lf2.grid(row=1, column=0, sticky=tk.EW, padx=6, pady=6)
-        lf2.grid_columnconfigure(0, minsize=100, weight=1)
-        self.lf2 = lf2
+        self.lf2 = ttk.LabelFrame(self, text='File 2:', padding=(12,6))
+        self.lf2.grid(row=1, column=0, sticky=tk.EW, padx=6, pady=6)
+        self.lf2.grid_columnconfigure(0, minsize=100, weight=1)
+
 
         filename = ttk.Entry(
-            master=lf2, 
+            master=self.lf2, 
             text="Input File 2", 
             textvariable=self.input2_filename)
         filename.grid(row=0, column=0, sticky=tk.EW)
@@ -119,13 +129,13 @@ class Application(ttk.Frame):
         filename.dnd_bind('<<Drop>>', lambda event: self.drop(event, self.input2_filename))
         
         filename_chooser = ttk.Button(
-            master=lf2, 
+            master=self.lf2, 
             text="\N{Horizontal Ellipsis}", # aka "..."
             command=lambda:self.prompt_for_input_file(self.input2_filename) )
         filename_chooser.grid(row=0, column=1)
 
         input2_reverse = ttk.Checkbutton(
-            master=lf2, 
+            master=self.lf2, 
             text="Reverse", 
             variable=self.input2_reverse)
         input2_reverse.grid(row=1, column=0, sticky=tk.W)
@@ -156,6 +166,12 @@ class Application(ttk.Frame):
             variable=self.mode_selection, 
             value = 2,
             command=self.gui_update).grid(row=0,column=2)
+        ttk.Radiobutton(
+            lf3_buttons, 
+            text='Separate', 
+            variable=self.mode_selection, 
+            value = 3,
+            command=self.gui_update).grid(row=0,column=3)
 
         ttk.Checkbutton(
             lf3,
@@ -166,11 +182,11 @@ class Application(ttk.Frame):
         lf4.grid(row=3, column=0, sticky=tk.S+tk.EW, padx=12, pady=12)
         lf4.columnconfigure(6, weight=1)
         
-        self.combine_btn = ttk.Button(
+        self.process_btn = ttk.Button(
             master=lf4,
             text='Process',
             command=self.process_pdf)
-        self.combine_btn.grid(row=0, column=0, sticky=tk.S)
+        self.process_btn.grid(row=0, column=0, sticky=tk.S)
 
         self.quit_btn = ttk.Button(
             lf4,
@@ -203,10 +219,23 @@ class Application(ttk.Frame):
 
         self.gui_mode_switch(previous_mode=previous_mode, next_mode=next_mode)
 
-        if self.input1_filename.get() and self.input2_filename.get():
-            tkhelpers.widget_recursive_enabler(self.combine_btn, True)
+        #  Gui enablers.
+        if self.mode == 'split':
+            # Split mode only requires input1_filename
+            if self.input1_filename.get():
+                tkhelpers.widget_recursive_enabler(self.process_btn, True)
+            else:
+                tkhelpers.widget_recursive_enabler(self.process_btn, False)
+
+            tkhelpers.widget_recursive_enabler(self.lf2, False)
         else:
-            tkhelpers.widget_recursive_enabler(self.combine_btn, False)
+            # Other modes need both filenames.
+            if self.input1_filename.get() and self.input2_filename.get():
+                tkhelpers.widget_recursive_enabler(self.process_btn, True)
+            else:
+                tkhelpers.widget_recursive_enabler(self.process_btn, False)
+
+            tkhelpers.widget_recursive_enabler(self.lf2, True)
 
     def prompt_for_input_file(self, var):
 
@@ -227,20 +256,25 @@ class Application(ttk.Frame):
         
         self.after_idle(self.gui_update)
 
-    def prompt_for_output_file(self):
-
+    def prompt_for_output_path(self, output_is_dir=False):
         initial_dir=os.path.dirname(self.last_outputfile)
         initial_file=os.path.basename(self.last_outputfile)
 
-        filename = tk.filedialog.asksaveasfilename(
-            title='Output File',
-            defaultextension='.pdf',
-            filetypes = (('PDF files', '*.pdf'),),
-            initialdir=initial_dir,
-            initialfile=initial_file
-        )
+        if not output_is_dir:
+            output_path = tk.filedialog.asksaveasfilename(
+                title='Output File',
+                defaultextension='.pdf',
+                filetypes = (('PDF files', '*.pdf'),),
+                initialdir=initial_dir,
+                initialfile=initial_file
+            )
+        else:
+            output_path = tk.filedialog.askdirectory(
+                title='Output File',
+                initialdir=initial_dir,
+            )
 
-        return filename
+        return output_path
 
     def confirm_result(self, filepath):
         result = tkinter.messagebox.askyesno(
@@ -252,33 +286,63 @@ class Application(ttk.Frame):
             subprocess.call(('cmd /c start "" "'+ filepath +'"') if os.name is 'nt' else ('open' if sys.platform.startswith('darwin') else 'xdg-open', filepath))
 
     def process_pdf(self):
-        output_filename = self.prompt_for_output_file()
-        if not output_filename:
-            return
-
+        output_path = ""
+        
         if self.mode == 'zip':
+            output_path = self.prompt_for_output_path()
+            if not output_path:
+                return
+
             pdfmanipulation.pdf_recto_verso(
                 self.input1_filename.get(),
                 self.input2_filename.get(),
-                output_filename,
+                output_path,
                 reverse1=self.input1_reverse.get() != 0,
                 reverse2=self.input2_reverse.get() != 0)
 
         elif self.mode in ('append', 'prepend'):
+            output_path = self.prompt_for_output_path()
+            if not output_path:
+                return
+
             pdfmanipulation.pdf_append(
                 self.input1_filename.get(),
                 self.input2_filename.get(),
-                output_filename,
+                output_path,
                 reverse1=self.input1_reverse.get() != 0,
                 reverse2=self.input2_reverse.get() != 0,
                 append=self.mode=='append')
 
+        elif self.mode == 'split':
+            output_path = self.prompt_for_output_path(output_is_dir=True)
+            if not output_path:
+                return
+
+            # Call split in dry-run to only get output file names. Reverse is not important here.
+            output_files = pdfmanipulation.pdf_split(
+                self.input1_filename.get(), 
+                output_path, 
+                dry_run=True)
+
+            if is_files_exists(output_files):
+                ok_to_overwrite = tkinter.messagebox.askyesno(
+                    title="Split files", 
+                    message="The split operation will overite some files.\nContinue ?")
+                if not ok_to_overwrite:
+                    return
+
+            # Do the actual split operation
+            pdfmanipulation.pdf_split(
+                self.input1_filename.get(), 
+                output_path, 
+                reverse=self.input1_reverse.get() != 0)
         else:
             assert(False)
 
-        self.last_outputfile = output_filename
+        # Offer to open the result file or directory
+        self.last_outputfile = output_path
         if self.confirm_output.get():
-            self.confirm_result(filepath=output_filename)
+            self.confirm_result(filepath=output_path)
 
 def report_callback_exception(self, exc, val, tb):
     tkinter.messagebox.showerror("Error", message=str(val))
