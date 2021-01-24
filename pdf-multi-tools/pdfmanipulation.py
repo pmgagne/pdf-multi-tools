@@ -69,7 +69,7 @@ def pdf_append(
 
     outputfile = tempfile.NamedTemporaryFile()
 
-    f1, f2 = open(input1, "rb"), open(input2, "rb"),
+    f1, f2 = open(input1, "rb"), open(input2, "rb")
     r1, r2 = PdfFileReader(f1), PdfFileReader(f2)
     writer = PdfFileWriter()
 
@@ -106,6 +106,33 @@ def pdf_append(
     shutil.copyfileobj(outputfile, f2)
     f2.close()
 
+def pdf_merge_directory(
+    input_files,
+    output: str,
+    reverse: bool = False):
+    """
+    Append or prepend input1 pages to input2, then save to output.
+    :param input: file list
+    :param output: output file
+    :param reverse: reverse page order of input1 if True
+    """
+    outputfile = tempfile.NamedTemporaryFile()
+    writer = PdfFileWriter()
+
+    if reverse:
+        input_files = reversed(input_files)
+
+    for input_file in input_files:
+        f = open(input_file, "rb")
+        r = PdfFileReader(f)
+        for p in r.pages:
+            writer.addPage(p)
+        writer.write(outputfile)
+
+    outputfile.seek(0)
+    f2 = open(output, "wb")
+    shutil.copyfileobj(outputfile, f2)
+    f2.close()
 
 def pdf_split(
     input: str,
@@ -150,3 +177,70 @@ def pdf_split(
                 outputfile.close()
 
     return output_paths
+
+def pdf_delete_page(
+    input1: str,
+    output: str,
+    pages):
+    """
+    Zip pages of input1 and input2 in one output file. Useful for putting
+    even and odd pages together in one document.
+    :param input1: input file
+    :param output: output file
+    :param pages: List of pages number to remove (1-based index)
+    """
+
+    outputfile = tempfile.NamedTemporaryFile()
+
+    f1 = open(input1, "rb")
+    r1 = PdfFileReader(f1)
+    writer = PdfFileWriter()
+
+    for page_no, page in enumerate(r1.pages):
+        if page_no+1 not in pages:
+            writer.addPage(page)
+
+    writer.write(outputfile)
+
+    f1.close()
+
+    outputfile.seek(0)
+    f2 = open(output, "wb")
+    shutil.copyfileobj(outputfile, f2)
+    f2.close()
+
+def pdf_rotate_page(
+    input1: str,
+    output: str,
+    angle: float,
+    pages):
+    """
+    Zip pages of input1 and input2 in one output file. Useful for putting
+    even and odd pages together in one document.
+    :param input1: input file
+    :param output: output file
+    :param angle: rotation angle in degrees 
+    :param pages: List of pages number to remove (1-based index) or None
+                  to rotate all
+    """
+
+    outputfile = tempfile.NamedTemporaryFile()
+
+    f1 = open(input1, "rb")
+    r1 = PdfFileReader(f1)
+    writer = PdfFileWriter()
+
+    for page_no, page in enumerate(r1.pages):
+        if pages is None or page_no+1 in pages:
+            writer.addPage(page.rotateClockwise(angle))
+        else:
+            writer.addPage(page)
+
+    writer.write(outputfile)
+
+    f1.close()
+
+    outputfile.seek(0)
+    f2 = open(output, "wb")
+    shutil.copyfileobj(outputfile, f2)
+    f2.close()

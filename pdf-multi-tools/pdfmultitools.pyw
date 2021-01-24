@@ -2,6 +2,7 @@
 
 import sys, os, subprocess
 import os.path
+from enum import IntEnum
 
 import tkinter as tk
 from tkinter import ttk
@@ -13,6 +14,17 @@ import pdfmanipulation
 import tkhelpers
 import tkinterdnd2
 
+class Operation(IntEnum):
+    NONE = 0
+    ZIP = 1
+    APPEND = 2
+    PREPEND = 3
+    SPLIT = 4
+    DIR_COMBINE = 5
+    PAGE_DELETE = 6
+    PAGE_ROTATE = 7
+    METADATA_EDIT = 8
+
 def is_files_exists(files):
     """Return True if at least one file (in files) already exists."""
     for file in files:
@@ -20,9 +32,71 @@ def is_files_exists(files):
             return True
     return False
 
-class Application(ttk.Frame):
-    mode_defs = bidict.Bidict({int(0): 'zip', int(1): 'append', int(2): 'prepend', int(3): 'split'})
+def pdf_files_in_directory(dir_path):
+    """Return a list of all PDF files in dir_path."""
+    pdf_files = []
 
+    if os.path.isfile(dir_path):
+        dir_path = os.path.dirname(dir_path)
+
+    files = os.scandir(dir_path)
+    for file in files:
+        if os.path.isfile(file)  \
+                and os.path.splitext(file.name)[1].upper() == '.PDF':
+            pdf_files.append(file.path)
+
+    pdf_files.sort()
+    return pdf_files
+
+def get_page_numbers(pageRange):
+    # parse a page range (i.e: 1,2,5,56-100,241) and return its 
+    # integer equivalent
+    pageIndex = 0
+    inDigit = False
+    inNums2 = False
+    nums = ""
+    nums2 = ""
+    pageNumbers = []
+ 
+    while(pageIndex < len(pageRange)):
+        if(pageRange[pageIndex].isdigit()):
+            inDigit = True
+        else:
+            inDigit = False
+ 
+        if(inDigit):
+            if(inNums2 == False):
+                nums += pageRange[pageIndex]
+            else:
+                nums2 += pageRange[pageIndex]
+        else:
+            if(nums != "" and pageRange[pageIndex] == "," and inNums2 == False):
+                pageNumbers.append(int(nums))
+                nums = ""
+            elif(nums != "" and pageRange[pageIndex] == "-"):
+                inNums2 = True
+            elif(nums2 != "" and inNums2):
+                for x in range(int(nums), int(nums2)+1):
+                    pageNumbers.append(x)
+                nums = ""
+                nums2 = ""
+                inNums2 = False
+            elif((nums != "" and pageRange[pageIndex] != ",")
+                or (nums != "" and pageRange[pageIndex] != "-")):
+                pageNumbers.append(int(nums))
+                nums = ""
+        pageIndex += 1
+ 
+    # DO THIS IF NUMBERS ARE LEFT OVER FROM THE ABOVE LOOP ^
+    if(nums != "" and nums2 != ""):
+        for x in range(int(nums), int(nums2)+1):
+            pageNumbers.append(x)
+    elif(nums != ""):
+        pageNumbers.append(int(nums))
+ 
+    return pageNumbers
+
+class Application(ttk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
         self.pack(expand=1, fill='both')
@@ -40,42 +114,61 @@ class Application(ttk.Frame):
 
         self.input1_filename = tk.StringVar()
         self.input1_reverse = tk.IntVar()
+        self.input1_page_range = tk.StringVar()
+        self.input1_argument = tk.DoubleVar()
 
         self.input2_filename = tk.StringVar()
         self.input2_reverse = tk.IntVar()
 
-        self.mode = 'zip'
+        self.mode = Operation.ZIP
         self.mode_selection = tk.IntVar()
-        self.mode_selection.set(self.mode_defs.inverse[self.mode][0])
+        self.mode_selection.set(self.mode.value)
         self.confirm_output = tk.IntVar()
 
         self.create_widgets()  
-        self.gui_mode_switch(previous_mode="", next_mode='zip')
+        self.gui_mode_switch(previous_mode=Operation.NONE, next_mode=Operation.ZIP)
         self.after_idle(self.gui_update)
 
     def create_parameters(self):
-        parameters = {'general': {}, 'zip':{}, 'append':{}, 'prepend':{}, 'split':{}}
+        parameters = {
+            'general': {}, 
+            Operation.ZIP:{}, 
+            Operation.APPEND:{}, 
+            Operation.PREPEND:{}, 
+            Operation.SPLIT:{}, 
+            Operation.DIR_COMBINE:{},
+            Operation.PAGE_DELETE:{},
+            Operation.PAGE_ROTATE:{}}
 
         parameters['general']['confirm'] = True
         
-        parameters['zip']['input1_reverse'] = False
-        parameters['zip']['input2_reverse'] = True
+        parameters[Operation.ZIP]['input1_reverse'] = False
+        parameters[Operation.ZIP]['input2_reverse'] = True
 
-        parameters['append']['input1_reverse'] = False
-        parameters['append']['input2_reverse'] = False
+        parameters[Operation.APPEND]['input1_reverse'] = False
+        parameters[Operation.APPEND]['input2_reverse'] = False
 
-        parameters['prepend']['input1_reverse'] = False
-        parameters['prepend']['input2_reverse'] = False
+        parameters[Operation.PREPEND]['input1_reverse'] = False
+        parameters[Operation.PREPEND]['input2_reverse'] = False
 
-        parameters['split']['input1_reverse'] = False
-        parameters['split']['input2_reverse'] = False
+        parameters[Operation.SPLIT]['input1_reverse'] = False
+        parameters[Operation.SPLIT]['input2_reverse'] = False
+
+        parameters[Operation.DIR_COMBINE]['input1_reverse'] = False
+        parameters[Operation.DIR_COMBINE]['input2_reverse'] = False
+
+        parameters[Operation.PAGE_DELETE]['input1_reverse'] = False
+        parameters[Operation.PAGE_DELETE]['input2_reverse'] = False
+
+        parameters[Operation.PAGE_ROTATE]['input1_reverse'] = False
+        parameters[Operation.PAGE_ROTATE]['input2_reverse'] = False
 
         return parameters
 
-    def gui_mode_switch(self, previous_mode:str, next_mode:str):
+    def gui_mode_switch(self, previous_mode:Operation, next_mode:Operation):
         """Set widget state based on active parameters"""
 
-        if previous_mode and previous_mode != next_mode:
+        if previous_mode != Operation.NONE and previous_mode != next_mode:
             # Save previous mode params
             self.parameters[previous_mode]['input1_reverse'] = self.input1_reverse.get()!=0
             self.parameters[previous_mode]['input2_reverse'] = self.input2_reverse.get()!=0
@@ -108,17 +201,28 @@ class Application(ttk.Frame):
             command=lambda:self.prompt_for_input_file(self.input1_filename) )
         filename_chooser.grid(row=0, column=1)
 
-        input1_reverse = ttk.Checkbutton(
+        self.input1_reverse_checkbox = ttk.Checkbutton(
             master=self.lf1, 
             text="Reverse", 
             variable=self.input1_reverse)
-        input1_reverse.grid(row=1, column=0, sticky=tk.W)
+        self.input1_reverse_checkbox.grid(row=1, column=0, sticky=tk.W)
+
+        self.page_range1 = ttk.Entry(
+            master=self.lf1,
+            text="",
+            textvariable=self.input1_page_range)
+        self.page_range1.grid(row=2, column=0, sticky=tk.W)
+
+        self.argument1 = ttk.Entry(
+            master=self.lf1,
+            text="",
+            textvariable=self.input1_argument)
+        self.argument1.grid(row=2, column=1, sticky=tk.W)
 
         # Input file 2
         self.lf2 = ttk.LabelFrame(self, text='File 2:', padding=(12,6))
         self.lf2.grid(row=1, column=0, sticky=tk.EW, padx=6, pady=6)
         self.lf2.grid_columnconfigure(0, minsize=100, weight=1)
-
 
         filename = ttk.Entry(
             master=self.lf2, 
@@ -141,42 +245,56 @@ class Application(ttk.Frame):
         input2_reverse.grid(row=1, column=0, sticky=tk.W)
 
         # Output file
-        lf3 = ttk.LabelFrame(self, text='Output:', padding=(12,6))
+        lf3 = ttk.LabelFrame(self, text='Operation:', padding=(12,6))
         lf3.grid(row=2, column=0, sticky=tk.EW, padx=6, pady=6)
-        lf3.grid_columnconfigure(0, minsize=100, weight=1)
-
-        lf3_buttons = ttk.LabelFrame(lf3, text="Mode:", padding=(12,6))
-        lf3_buttons.grid(row=1, column=0, sticky=tk.W)
         
         ttk.Radiobutton(
-            lf3_buttons, 
+            lf3, 
             text='Recto/Verso', 
             variable=self.mode_selection, 
-            value = 0,
-            command=self.gui_update).grid(row=0,column=0)
+            value = Operation.ZIP.value,
+            command=self.gui_update).grid(row=0, column=0, padx=6)
         ttk.Radiobutton(
-            lf3_buttons, 
+            lf3, 
             text='Append',
             variable=self.mode_selection,
-            value = 1,
-            command=self.gui_update).grid(row=0,column=1)
+            value = Operation.APPEND.value,
+            command=self.gui_update).grid(row=0, column=1, padx=6)
         ttk.Radiobutton(
-            lf3_buttons, 
+            lf3, 
             text='Prepend', 
             variable=self.mode_selection, 
-            value = 2,
-            command=self.gui_update).grid(row=0,column=2)
+            value = Operation.PREPEND.value,
+            command=self.gui_update).grid(row=0, column=2, padx=6)
         ttk.Radiobutton(
-            lf3_buttons, 
+            lf3, 
             text='Separate', 
             variable=self.mode_selection, 
-            value = 3,
-            command=self.gui_update).grid(row=0,column=3)
+            value = Operation.SPLIT.value,
+            command=self.gui_update).grid(row=0, column=3, padx=6)
+        ttk.Radiobutton(
+            lf3, 
+            text='Dir Combine', 
+            variable=self.mode_selection, 
+            value = Operation.DIR_COMBINE.value,
+            command=self.gui_update).grid(row=1, column=0, padx=6)
+        ttk.Radiobutton(
+            lf3, 
+            text='Page Delete', 
+            variable=self.mode_selection, 
+            value = Operation.PAGE_DELETE.value,
+            command=self.gui_update).grid(row=1, column=1, padx=6)
+        ttk.Radiobutton(
+            lf3, 
+            text='Page Rotate', 
+            variable=self.mode_selection, 
+            value = Operation.PAGE_ROTATE.value,
+            command=self.gui_update).grid(row=1, column=2, padx=6)
 
         ttk.Checkbutton(
             lf3,
-            text="Confirm Result", 
-            variable=self.confirm_output).grid(row=2, column=0, sticky=tk.W)
+            text="Confirm Result",
+            variable=self.confirm_output).grid(row=2, column=0, sticky=tk.W, pady=12, padx=6)
 
         lf4 = ttk.Frame(self)
         lf4.grid(row=3, column=0, sticky=tk.S+tk.EW, padx=12, pady=12)
@@ -215,12 +333,12 @@ class Application(ttk.Frame):
 
     def gui_update(self):
         previous_mode = self.mode
-        next_mode = self.mode_defs[self.mode_selection.get()]
+        next_mode = self.mode_selection.get()
 
         self.gui_mode_switch(previous_mode=previous_mode, next_mode=next_mode)
 
         #  Gui enablers.
-        if self.mode == 'split':
+        if self.mode in [Operation.SPLIT, Operation.DIR_COMBINE, Operation.PAGE_DELETE, Operation.PAGE_ROTATE]:
             # Split mode only requires input1_filename
             if self.input1_filename.get():
                 tkhelpers.widget_recursive_enabler(self.process_btn, True)
@@ -236,6 +354,19 @@ class Application(ttk.Frame):
                 tkhelpers.widget_recursive_enabler(self.process_btn, False)
 
             tkhelpers.widget_recursive_enabler(self.lf2, True)
+
+        # Enable page selector
+        if self.mode in [Operation.PAGE_DELETE, Operation.PAGE_ROTATE]:
+            self.page_range1.state(['!disabled'])
+            self.input1_reverse_checkbox.state(['disabled'])
+        else:
+            self.page_range1.state(['disabled'])
+            self.input1_reverse_checkbox.state(['!disabled'])
+
+        if self.mode in [Operation.PAGE_ROTATE]:
+            self.argument1.state(['!disabled'])
+        else:
+            self.argument1.state(['disabled'])
 
     def prompt_for_input_file(self, var):
 
@@ -283,12 +414,14 @@ class Application(ttk.Frame):
             "Do you want to open the resulting file?""")
 
         if result:
-            subprocess.call(('cmd /c start "" "'+ filepath +'"') if os.name is 'nt' else ('open' if sys.platform.startswith('darwin') else 'xdg-open', filepath))
+            subprocess.call(('cmd /c start "" "'+ filepath +'"') if os.name == 'nt' else ('open' if sys.platform.startswith('darwin') else 'xdg-open', filepath))
 
     def process_pdf(self):
         output_path = ""
         
-        if self.mode == 'zip':
+        #TODO(PG) Add a try/catch
+
+        if self.mode == Operation.ZIP:
             output_path = self.prompt_for_output_path(initial_path=self.last_outputfile)
             if not output_path:
                 return
@@ -300,7 +433,7 @@ class Application(ttk.Frame):
                 reverse1=self.input1_reverse.get() != 0,
                 reverse2=self.input2_reverse.get() != 0)
 
-        elif self.mode in ('append', 'prepend'):
+        elif self.mode == (Operation.APPEND, Operation.PREPEND):
             output_path = self.prompt_for_output_path(
                 initial_path=self.last_outputfile)
             if not output_path:
@@ -312,9 +445,9 @@ class Application(ttk.Frame):
                 output_path,
                 reverse1=self.input1_reverse.get() != 0,
                 reverse2=self.input2_reverse.get() != 0,
-                append=self.mode=='append')
+                append=self.mode is Operation.APPEND)
 
-        elif self.mode == 'split':
+        elif self.mode == Operation.SPLIT:
             output_path = self.prompt_for_output_path(
                 output_is_dir=True,
                 initial_path=self.input1_filename.get())
@@ -331,7 +464,7 @@ class Application(ttk.Frame):
             if is_files_exists(output_files):
                 ok_to_overwrite = tkinter.messagebox.askyesno(
                     title="Split files", 
-                    message="The split operation will overite some files.\nContinue ?")
+                    message="The split operation will overide some files.\nContinue ?")
                 if not ok_to_overwrite:
                     return
 
@@ -340,12 +473,65 @@ class Application(ttk.Frame):
                 self.input1_filename.get(), 
                 output_path, 
                 reverse=self.input1_reverse.get() != 0)
+        
+        elif self.mode == Operation.DIR_COMBINE:
+            files = pdf_files_in_directory(self.input1_filename.get())
+            print(files)
+            if not files:
+                tkinter.messagebox.showwarning(title='pdfmultitools', message='No PDF files found.')
+                return
+
+            output_path = self.prompt_for_output_path(
+                output_is_dir=False,
+                initial_path=self.input1_filename.get())
+
+            if not output_path:
+                return
+
+            pdfmanipulation.pdf_merge_directory(
+                files,
+                output_path,
+                reverse=self.input1_reverse.get() != 0
+            )
+
+        elif self.mode == Operation.PAGE_DELETE:
+            output_path = self.prompt_for_output_path(
+                initial_path=self.last_outputfile)
+            if not output_path:
+                return
+
+            pages = get_page_numbers(self.input1_page_range.get())
+
+            pdfmanipulation.pdf_delete_page(
+                self.input1_filename.get(),
+                output_path,
+                pages=pages)
+
+        elif self.mode == Operation.PAGE_ROTATE:
+            angle=self.input1_argument.get()
+            if angle % 90 != 0:
+                tkinter.messagebox.showerror("Error", message="Angle must be multiple of 90°")
+                return
+            
+            output_path = self.prompt_for_output_path(
+                initial_path=self.last_outputfile)
+            if not output_path:
+                return
+
+            pages = get_page_numbers(self.input1_page_range.get())
+
+            pdfmanipulation.pdf_rotate_page(
+                self.input1_filename.get(),
+                output_path,
+                angle=self.input1_argument.get(),
+                pages=pages)
+
         else:
             assert(False)
 
         # Memorise last output file path to serve as initial path next time,
         # except for split mode. 
-        if self.mode != 'split':
+        if self.mode != Operation.SPLIT:
             self.last_outputfile = output_path
 
         # Offer to open the resulting file or directory
