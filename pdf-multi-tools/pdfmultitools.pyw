@@ -184,7 +184,7 @@ class Application(ttk.Frame):
 
         # Input file 1
         self.lf1 = ttk.LabelFrame(self, text='File 1:', padding=(12,6))
-        self.lf1.grid(row=0, column=0, sticky=tk.EW, padx=6, pady=12)
+        self.lf1.grid(row=0, column=0, sticky=tk.EW, padx=6, pady=6)
         self.lf1.grid_columnconfigure(0, minsize=100, weight=1)
 
         filename = ttk.Entry(
@@ -207,17 +207,26 @@ class Application(ttk.Frame):
             variable=self.input1_reverse)
         self.input1_reverse_checkbox.grid(row=1, column=0, sticky=tk.W)
 
+        argument_frame = tk.Frame(master=self.lf1)
+        argument_frame.grid(row=2, column=0, sticky=tk.W)
+
+        l1 = ttk.Label(argument_frame, text="Pages: ")
+        l1.grid(row=0, column=0, sticky=tk.W)
+
         self.page_range1 = ttk.Entry(
-            master=self.lf1,
+            master=argument_frame,
             text="",
             textvariable=self.input1_page_range)
-        self.page_range1.grid(row=2, column=0, sticky=tk.W)
+        self.page_range1.grid(row=0, column=1, sticky=tk.W)
+
+        l2 = ttk.Label(argument_frame, text="  Argument: ")
+        l2.grid(row=0, column=2, sticky=tk.W)
 
         self.argument1 = ttk.Entry(
-            master=self.lf1,
+            master=argument_frame,
             text="",
             textvariable=self.input1_argument)
-        self.argument1.grid(row=2, column=1, sticky=tk.W)
+        self.argument1.grid(row=0, column=3, sticky=tk.W)
 
         # Input file 2
         self.lf2 = ttk.LabelFrame(self, text='File 2:', padding=(12,6))
@@ -253,48 +262,48 @@ class Application(ttk.Frame):
             text='Recto/Verso', 
             variable=self.mode_selection, 
             value = Operation.ZIP.value,
-            command=self.gui_update).grid(row=0, column=0, padx=6)
+            command=self.gui_update).grid(row=0, column=0, padx=1, sticky=tk.W)
         ttk.Radiobutton(
             lf3, 
             text='Append',
             variable=self.mode_selection,
             value = Operation.APPEND.value,
-            command=self.gui_update).grid(row=0, column=1, padx=6)
+            command=self.gui_update).grid(row=0, column=1, padx=1, sticky=tk.W)
         ttk.Radiobutton(
             lf3, 
             text='Prepend', 
             variable=self.mode_selection, 
             value = Operation.PREPEND.value,
-            command=self.gui_update).grid(row=0, column=2, padx=6)
+            command=self.gui_update).grid(row=0, column=2, padx=1, sticky=tk.W)
         ttk.Radiobutton(
             lf3, 
             text='Separate', 
             variable=self.mode_selection, 
             value = Operation.SPLIT.value,
-            command=self.gui_update).grid(row=0, column=3, padx=6)
+            command=self.gui_update).grid(row=0, column=3, padx=1, sticky=tk.W)
         ttk.Radiobutton(
             lf3, 
             text='Dir Combine', 
             variable=self.mode_selection, 
             value = Operation.DIR_COMBINE.value,
-            command=self.gui_update).grid(row=1, column=0, padx=6)
+            command=self.gui_update).grid(row=1, column=0, padx=1, sticky=tk.W)
         ttk.Radiobutton(
             lf3, 
             text='Page Delete', 
             variable=self.mode_selection, 
             value = Operation.PAGE_DELETE.value,
-            command=self.gui_update).grid(row=1, column=1, padx=6)
+            command=self.gui_update).grid(row=1, column=1, padx=1, sticky=tk.W)
         ttk.Radiobutton(
             lf3, 
             text='Page Rotate', 
             variable=self.mode_selection, 
             value = Operation.PAGE_ROTATE.value,
-            command=self.gui_update).grid(row=1, column=2, padx=6)
+            command=self.gui_update).grid(row=1, column=2, padx=1, sticky=tk.W)
 
         ttk.Checkbutton(
             lf3,
             text="Confirm Result",
-            variable=self.confirm_output).grid(row=2, column=0, sticky=tk.W, pady=12, padx=6)
+            variable=self.confirm_output).grid(row=2, column=0, sticky=tk.W, pady=12, padx=1)
 
         lf4 = ttk.Frame(self)
         lf4.grid(row=3, column=0, sticky=tk.S+tk.EW, padx=12, pady=12)
@@ -433,7 +442,7 @@ class Application(ttk.Frame):
                 reverse1=self.input1_reverse.get() != 0,
                 reverse2=self.input2_reverse.get() != 0)
 
-        elif self.mode == (Operation.APPEND, Operation.PREPEND):
+        elif self.mode in (Operation.APPEND, Operation.PREPEND):
             output_path = self.prompt_for_output_path(
                 initial_path=self.last_outputfile)
             if not output_path:

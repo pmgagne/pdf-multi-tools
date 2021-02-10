@@ -50,6 +50,7 @@ def pdf_recto_verso(
     f2 = open(output, "wb")
     shutil.copyfileobj(outputfile, f2)
     f2.close()
+    outputfile.close()
 
 def pdf_append(
     input1: str,
@@ -105,6 +106,7 @@ def pdf_append(
     f2 = open(output, "wb")
     shutil.copyfileobj(outputfile, f2)
     f2.close()
+    outputfile.close()
 
 def pdf_merge_directory(
     input_files,
@@ -128,11 +130,13 @@ def pdf_merge_directory(
         for p in r.pages:
             writer.addPage(p)
         writer.write(outputfile)
+        f.close()
 
     outputfile.seek(0)
     f2 = open(output, "wb")
     shutil.copyfileobj(outputfile, f2)
     f2.close()
+    outputfile.close()
 
 def pdf_split(
     input: str,
@@ -176,20 +180,20 @@ def pdf_split(
                 writer.write(outputfile)
                 outputfile.close()
 
+            inputfile.close()
+
     return output_paths
 
 def pdf_delete_page(
     input1: str,
     output: str,
     pages):
-    """
-    Zip pages of input1 and input2 in one output file. Useful for putting
+    """Zip pages of input1 and input2 in one output file. Useful for putting
     even and odd pages together in one document.
     :param input1: input file
     :param output: output file
     :param pages: List of pages number to remove (1-based index)
     """
-
     outputfile = tempfile.NamedTemporaryFile()
 
     f1 = open(input1, "rb")
@@ -208,14 +212,14 @@ def pdf_delete_page(
     f2 = open(output, "wb")
     shutil.copyfileobj(outputfile, f2)
     f2.close()
+    outputfile.close()
 
 def pdf_rotate_page(
     input1: str,
     output: str,
     angle: float,
     pages):
-    """
-    Zip pages of input1 and input2 in one output file. Useful for putting
+    """Zip pages of input1 and input2 in one output file. Useful for putting
     even and odd pages together in one document.
     :param input1: input file
     :param output: output file
@@ -237,10 +241,10 @@ def pdf_rotate_page(
             writer.addPage(page)
 
     writer.write(outputfile)
-
     f1.close()
 
     outputfile.seek(0)
     f2 = open(output, "wb")
     shutil.copyfileobj(outputfile, f2)
     f2.close()
+    outputfile.close()
