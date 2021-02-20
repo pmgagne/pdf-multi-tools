@@ -9,6 +9,7 @@ from tkinter import ttk
 import tkinter.filedialog
 import tkinter.messagebox
 
+
 import pdfmanipulation
 import tkhelpers
 import tkinterdnd2
@@ -109,7 +110,6 @@ class Application(ttk.Frame):
 
         self.last_inputfile1 = ""
         self.last_inputfile2 = ""
-        self.last_outputfile = ""
 
         self.input1_filename = tk.StringVar()
         self.input1_reverse = tk.IntVar()
@@ -143,24 +143,31 @@ class Application(ttk.Frame):
         
         parameters[Operation.ZIP]['input1_reverse'] = False
         parameters[Operation.ZIP]['input2_reverse'] = True
+        parameters[Operation.ZIP]['output_path'] = ""
 
         parameters[Operation.APPEND]['input1_reverse'] = False
         parameters[Operation.APPEND]['input2_reverse'] = False
+        parameters[Operation.APPEND]['output_path'] = ""
 
         parameters[Operation.PREPEND]['input1_reverse'] = False
         parameters[Operation.PREPEND]['input2_reverse'] = False
+        parameters[Operation.PREPEND]['output_path'] = ""
 
         parameters[Operation.SPLIT]['input1_reverse'] = False
         parameters[Operation.SPLIT]['input2_reverse'] = False
+        parameters[Operation.SPLIT]['output_path'] = ""
 
         parameters[Operation.DIR_COMBINE]['input1_reverse'] = False
         parameters[Operation.DIR_COMBINE]['input2_reverse'] = False
+        parameters[Operation.DIR_COMBINE]['output_path'] = ""
 
         parameters[Operation.PAGE_DELETE]['input1_reverse'] = False
         parameters[Operation.PAGE_DELETE]['input2_reverse'] = False
+        parameters[Operation.PAGE_DELETE]['output_path'] = ""
 
         parameters[Operation.PAGE_ROTATE]['input1_reverse'] = False
         parameters[Operation.PAGE_ROTATE]['input2_reverse'] = False
+        parameters[Operation.PAGE_ROTATE]['output_path'] = ""
 
         return parameters
 
@@ -382,13 +389,22 @@ class Application(ttk.Frame):
         initial_dir=os.path.dirname(initial_filepath)
         initial_file=os.path.basename(initial_filepath)
 
-        filename = tk.filedialog.askopenfilename(
-            master=self,
-            title='Input File',
-            filetypes = (('PDF files', '*.pdf'), ('All Files', '*.*')),
-            initialdir=initial_dir,
-            initialfile=initial_file
-        )
+        dir_select = self.mode == Operation.DIR_COMBINE
+
+        if not dir_select:
+            filename = tk.filedialog.askopenfilename(
+                master=self,
+                title='Input File',
+                filetypes = (('PDF files', '*.pdf'), ('All Files', '*.*')),
+                initialdir=initial_dir,
+                initialfile=initial_file
+            )
+        else:
+            filename = tk.filedialog.askdirectory(
+                master=self,
+                title='Input Directory',
+                initialdir=initial_dir
+            )
 
         if filename:
             var.set(filename)
@@ -426,124 +442,130 @@ class Application(ttk.Frame):
 
     def process_pdf(self):
         output_path = ""
-        
-        #TODO(PG) Add a try/catch
 
-        if self.mode == Operation.ZIP:
-            output_path = self.prompt_for_output_path(initial_path=self.last_outputfile)
-            if not output_path:
-                return
+        try:
+            last_outputfile = self.parameters[self.mode]['output_path']
 
-            pdfmanipulation.pdf_recto_verso(
-                self.input1_filename.get(),
-                self.input2_filename.get(),
-                output_path,
-                reverse1=self.input1_reverse.get() != 0,
-                reverse2=self.input2_reverse.get() != 0)
-
-        elif self.mode in (Operation.APPEND, Operation.PREPEND):
-            output_path = self.prompt_for_output_path(
-                initial_path=self.last_outputfile)
-            if not output_path:
-                return
-
-            pdfmanipulation.pdf_append(
-                self.input1_filename.get(),
-                self.input2_filename.get(),
-                output_path,
-                reverse1=self.input1_reverse.get() != 0,
-                reverse2=self.input2_reverse.get() != 0,
-                append=self.mode is Operation.APPEND)
-
-        elif self.mode == Operation.SPLIT:
-            output_path = self.prompt_for_output_path(
-                output_is_dir=True,
-                initial_path=self.input1_filename.get())
-
-            if not output_path:
-                return
-
-            # Call split in dry-run to only get output file names. Reverse is not important here.
-            output_files = pdfmanipulation.pdf_split(
-                self.input1_filename.get(), 
-                output_path, 
-                dry_run=True)
-
-            if is_files_exists(output_files):
-                ok_to_overwrite = tkinter.messagebox.askyesno(
-                    title="Split files", 
-                    message="The split operation will overide some files.\nContinue ?")
-                if not ok_to_overwrite:
+            if self.mode == Operation.ZIP:
+                output_path = self.prompt_for_output_path(initial_path=last_outputfile)
+                if not output_path:
                     return
 
-            # Do the actual split operation
-            pdfmanipulation.pdf_split(
-                self.input1_filename.get(), 
-                output_path, 
-                reverse=self.input1_reverse.get() != 0)
-        
-        elif self.mode == Operation.DIR_COMBINE:
-            files = pdf_files_in_directory(self.input1_filename.get())
-            if not files:
-                tkinter.messagebox.showwarning(title='pdfmultitools', message='No PDF files found.')
-                return
+                pdfmanipulation.pdf_recto_verso(
+                    self.input1_filename.get(),
+                    self.input2_filename.get(),
+                    output_path,
+                    reverse1=self.input1_reverse.get() != 0,
+                    reverse2=self.input2_reverse.get() != 0)
 
-            output_path = self.prompt_for_output_path(
-                output_is_dir=False,
-                initial_path=self.input1_filename.get())
+            elif self.mode in (Operation.APPEND, Operation.PREPEND):
+                output_path = self.prompt_for_output_path(
+                    initial_path=self.last_outputfile)
+                if not output_path:
+                    return
 
-            if not output_path:
-                return
+                pdfmanipulation.pdf_append(
+                    self.input1_filename.get(),
+                    self.input2_filename.get(),
+                    output_path,
+                    reverse1=self.input1_reverse.get() != 0,
+                    reverse2=self.input2_reverse.get() != 0,
+                    append=self.mode == Operation.APPEND)
 
-            pdfmanipulation.pdf_merge_directory(
-                files,
-                output_path,
-                reverse=self.input1_reverse.get() != 0
-            )
+            elif self.mode == Operation.SPLIT:
+                output_path = self.prompt_for_output_path(
+                    output_is_dir=True,
+                    initial_path=last_outputfile)
 
-        elif self.mode == Operation.PAGE_DELETE:
-            output_path = self.prompt_for_output_path(
-                initial_path=self.last_outputfile)
-            if not output_path:
-                return
+                if not output_path:
+                    return
 
-            pages = get_page_numbers(self.input1_page_range.get())
+                # Call split in dry-run to only get output file names. Reverse is not important here.
+                output_files = pdfmanipulation.pdf_split(
+                    self.input1_filename.get(), 
+                    output_path, 
+                    dry_run=True)
 
-            pdfmanipulation.pdf_delete_page(
-                self.input1_filename.get(),
-                output_path,
-                pages=pages)
+                if is_files_exists(output_files):
+                    ok_to_overwrite = tkinter.messagebox.askyesno(
+                        title="Split files", 
+                        message="The split operation will overide some files.\nContinue ?")
+                    if not ok_to_overwrite:
+                        return
 
-        elif self.mode == Operation.PAGE_ROTATE:
-            angle=self.input1_argument.get()
-            if angle % 90 != 0:
-                tkinter.messagebox.showerror("Error", message="Angle must be multiple of 90°")
-                return
+                # Do the actual split operation
+                pdfmanipulation.pdf_split(
+                    self.input1_filename.get(), 
+                    output_path, 
+                    reverse=self.input1_reverse.get() != 0)
             
-            output_path = self.prompt_for_output_path(
-                initial_path=self.last_outputfile)
-            if not output_path:
-                return
+            elif self.mode == Operation.DIR_COMBINE:
+                files = pdf_files_in_directory(self.input1_filename.get())
+                if not files:
+                    tkinter.messagebox.showwarning(title='pdfmultitools', message='No PDF files found.')
+                    return
 
-            pages = get_page_numbers(self.input1_page_range.get())
+                output_path = self.prompt_for_output_path(
+                    output_is_dir=False,
+                    initial_path=last_outputfile)
 
-            pdfmanipulation.pdf_rotate_page(
-                self.input1_filename.get(),
-                output_path,
-                angle=self.input1_argument.get(),
-                pages=pages)
+                if not output_path:
+                    return
 
-        else:
-            assert(False)
+                pdfmanipulation.pdf_merge_directory(
+                    files,
+                    output_path,
+                    reverse=self.input1_reverse.get() != 0
+                )
 
-        # Memorise last output file path to serve as initial path next time,
-        # except for split mode. 
-        if self.mode != Operation.SPLIT:
-            self.last_outputfile = output_path
+            elif self.mode == Operation.PAGE_DELETE:
+                output_path = self.prompt_for_output_path(
+                    initial_path=last_outputfile)
+                if not output_path:
+                    return
 
-        # Offer to open the resulting file or directory
-        if self.confirm_output.get():
-            self.confirm_result(filepath=output_path)
+                pages = get_page_numbers(self.input1_page_range.get())
+
+                pdfmanipulation.pdf_delete_page(
+                    self.input1_filename.get(),
+                    output_path,
+                    pages=pages)
+
+            elif self.mode == Operation.PAGE_ROTATE:
+                angle=self.input1_argument.get()
+                if angle % 90 != 0:
+                    tkinter.messagebox.showerror("Error", message="Angle must be multiple of 90°")
+                    return
+                
+                output_path = self.prompt_for_output_path(
+                    initial_path=last_outputfile)
+                if not output_path:
+                    return
+
+                pages = get_page_numbers(self.input1_page_range.get())
+
+                pdfmanipulation.pdf_rotate_page(
+                    self.input1_filename.get(),
+                    output_path,
+                    angle=self.input1_argument.get(),
+                    pages=pages)
+
+            else:
+                assert(False)
+
+            # Offer to open the resulting file or directory
+            if self.confirm_output.get():
+                self.confirm_result(filepath=output_path)
+
+            # Memorise last output file path to serve as initial path next time,
+            # except for split mode. 
+#            if self.mode != Operation.SPLIT:
+            self.parameters[self.mode]['output_path'] = output_path
+
+        except Exception as e:
+            message = str(e)
+            tkinter.messagebox.showwarning(title='Pdf Multi Tool', message=message)
+
 
 def report_callback_exception(self, exc, val, tb):
     tkinter.messagebox.showerror("Error", message=str(val))

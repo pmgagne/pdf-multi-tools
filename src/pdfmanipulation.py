@@ -234,7 +234,7 @@ def pdf_rotate_page(
     writer = PdfFileWriter()
 
     for page_no, page in enumerate(r1.pages):
-        if pages is None or page_no+1 in pages:
+        if not pages or page_no+1 in pages:
             writer.addPage(page.rotateClockwise(angle))
         else:
             writer.addPage(page)
