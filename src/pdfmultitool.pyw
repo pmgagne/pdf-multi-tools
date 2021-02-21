@@ -299,18 +299,18 @@ class Application(ttk.Frame):
         #  Gui enablers.
         if self.mode in [Operation.SPLIT, Operation.DIR_COMBINE, Operation.PAGE_DELETE, Operation.PAGE_ROTATE]:
             # Split mode only requires input1_filename
-            if self.input1_filename.get():
-                tkhelpers.widget_recursive_enabler(self.process_btn, True)
-            else:
-                tkhelpers.widget_recursive_enabler(self.process_btn, False)
+            # if self.input1_filename.get():
+            #     tkhelpers.widget_recursive_enabler(self.process_btn, True)
+            # else:
+            #     tkhelpers.widget_recursive_enabler(self.process_btn, False)
 
             tkhelpers.widget_recursive_enabler(self.lf2, False)
         else:
             # Other modes need both filenames.
-            if self.input1_filename.get() and self.input2_filename.get():
-                tkhelpers.widget_recursive_enabler(self.process_btn, True)
-            else:
-                tkhelpers.widget_recursive_enabler(self.process_btn, False)
+            # if self.input1_filename.get() and self.input2_filename.get():
+            #     tkhelpers.widget_recursive_enabler(self.process_btn, True)
+            # else:
+            #     tkhelpers.widget_recursive_enabler(self.process_btn, False)
 
             tkhelpers.widget_recursive_enabler(self.lf2, True)
 
@@ -458,11 +458,11 @@ class Application(ttk.Frame):
             text="Defaults are constant",
             variable=self.update_params).grid(row=3, column=0, sticky=tk.W, pady=12, padx=1)
 
-        self.process_btn = ttk.Button(
+        self.open_config_btn = ttk.Button(
             master=lf3,
             text='Configs',
             command=self.save_and_open_config)
-        self.process_btn.grid(row=3, column=1, sticky=tk.S)
+        self.open_config_btn.grid(row=3, column=1, sticky=tk.S)
 
         lf4 = ttk.Frame(self)
         lf4.grid(row=3, column=0, sticky=tk.S+tk.EW, padx=12, pady=12)
@@ -678,6 +678,20 @@ class Application(ttk.Frame):
         All GUI interaction is here, the called worker functions won't interact
         with user.
         """
+        # Temporary.
+        can_process = False
+        if self.mode in [Operation.SPLIT, Operation.DIR_COMBINE, Operation.PAGE_DELETE, Operation.PAGE_ROTATE]:
+            # Mode only requires input1_filename
+            if self.input1_filename.get():
+                can_process = True
+        else:
+            # Mode need both filenames.
+            if self.input1_filename.get() and self.input2_filename.get():
+                can_process = True
+
+        if not can_process:
+            return
+
         try:
             last_outputfile = self.parameters[self.mode.name]['output_path']
 
