@@ -108,12 +108,12 @@ def pdf_append(
     f2.close()
     outputfile.close()
 
-def pdf_merge_directory(
+def pdf_merge_files(
     input_files,
     output: str,
     reverse: bool = False):
     """
-    Append or prepend input1 pages to input2, then save to output.
+    Append all files into a single output file.
     :param input: file list
     :param output: output file
     :param reverse: reverse page order of input1 if True

@@ -7,8 +7,14 @@ GUI tools to modify PDF files, using tkinter, pypdf2 and pdftools
 
 ## To compile
 
-    py -3.8 -m venv .venv
+    python3 -m venv .venv
+
+
     .venv\Scripts\activate
-    pip install pdftools pyinstaller
+ or
+    source .venv/bin/activate
+ 
+    pip install pdftools pyinstaller appdirs pyyaml
+    pip intall pytest pylint
     pip install git+https://github.com/pmgagne/tkinterdnd2
     pyinstaller -F -w src\pdfmultitool.pyw --additional-hooks-dir=.
