@@ -151,9 +151,16 @@ class Application():
         self.write_params()
 
         self.create_widgets()
-        self.mode_selection.set(Operation.ZIP.value)
-        self.gui_mode_switch(mode=Operation.ZIP)
         root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+        if self.parameters['GENERAL']['mode']:
+            mode = Operation(self.parameters['GENERAL']['mode'])
+        else:
+            mode = Operation.ZIP.value
+
+        self.mode_selection.set(mode)
+        self.gui_mode_switch(mode=Operation.ZIP)
+
         self.mainframe.after_idle(self.gui_update)
 
 
@@ -176,8 +183,8 @@ class Application():
             Operation.PAGE_ROTATE.name:{}}
 
         parameters['GENERAL']['confirm'] = True
-        parameters['GENERAL']['constant_parameters'] = True
-        
+        parameters['GENERAL']['mode'] = None
+
         parameters[Operation.ZIP.name]['input1'] = ""
         parameters[Operation.ZIP.name]['input2'] = ""
         parameters[Operation.ZIP.name]['input1_reverse'] = False
@@ -233,7 +240,6 @@ class Application():
                 pass
 
         self.confirm_output.set(self.parameters['GENERAL']['confirm'])
-        self.update_params.set(self.parameters['GENERAL']['constant_parameters'])
 
 
     def write_params(self):
@@ -243,14 +249,18 @@ class Application():
         """
 
         if not os.path.exists(Application._CONFIGPATH):
-            os.mkdir(Application._CONFIGPATH)
+            os.makedirs(Application._CONFIGPATH)
+
+        if self.mode:
+            self.parameters['GENERAL']['mode'] = self.mode.name
+        else:
+            self.parameters['GENERAL']['mode'] = None
 
         with open(Application._CONFIGFILE, "w") as ymlfile:
             yaml.dump(self.parameters, ymlfile)
 
     def load_params_from_gui(self):
         self.parameters['GENERAL']['confirm'] = self.confirm_output.get() != 0
-        self.parameters['GENERAL']['constant_parameters'] = self.update_params.get() != 0
 
         self.parameters[self.mode.name]['input1'] = self.input1_filename.get()
 
@@ -264,7 +274,6 @@ class Application():
 
     def load_gui_from_params(self):
         self.confirm_output.set(self.parameters['GENERAL']['confirm'])
-        self.update_params.set(self.parameters['GENERAL']['constant_parameters'])
 
         self.input1_filename.set(self.parameters[self.mode.name]['input1'])
         
@@ -404,7 +413,7 @@ class Application():
 
         # Output file
         lf3 = ttk.LabelFrame(self.mainframe, text='Operation:', padding=(12,6))
-        lf3.grid(row=3, column=0, sticky=tk.EW, padx=6, pady=6)
+        lf3.grid(row=3, column=0, sticky=tk.EW+tk.N, padx=6, pady=6)
         
         ttk.Radiobutton(
             lf3, 
@@ -453,17 +462,6 @@ class Application():
             lf3,
             text="Confirm Result",
             variable=self.confirm_output).grid(row=2, column=0, sticky=tk.W, pady=12, padx=1)
-
-        ttk.Checkbutton(
-            lf3,
-            text="Defaults are constant",
-            variable=self.update_params).grid(row=3, column=0, sticky=tk.W, pady=12, padx=1)
-
-        self.open_config_btn = ttk.Button(
-            master=lf3,
-            text='Configs',
-            command=self.save_and_open_config)
-        self.open_config_btn.grid(row=3, column=1, sticky=tk.S)
 
         lf4 = ttk.Frame(self.mainframe)
         lf4.grid(row=3, column=0, sticky=tk.S+tk.EW, padx=12, pady=12)
@@ -571,11 +569,6 @@ class Application():
             subprocess.call(('xdg-open', filepath))
 
 
-    def save_and_open_config(self):
-        #self.write_params()
-        self.open_file(Application._CONFIGFILE)
-
-
     def do_zip(self, output_file):
         """Combine recto-verso."""
         reverse1=self.input1_reverse.get() != 0
@@ -588,10 +581,9 @@ class Application():
             reverse1=reverse1,
             reverse2=reverse2)
 
-        if self.update_params:
-            self.parameters[Operation.ZIP.name]['input1_reverse'] = reverse1
-            self.parameters[Operation.ZIP.name]['input2_reverse'] = reverse2
-            self.parameters[Operation.ZIP.name]['output_path'] = os.path.split(output_file)[0]
+        self.parameters[Operation.ZIP.name]['input1_reverse'] = reverse1
+        self.parameters[Operation.ZIP.name]['input2_reverse'] = reverse2
+        self.parameters[Operation.ZIP.name]['output_path'] = os.path.split(output_file)[0]
 
 
     def do_append_prepend(self, output_file, append):
@@ -607,11 +599,10 @@ class Application():
             reverse2=self.input2_reverse.get() != 0,
             append=append)
 
-        if self.update_params:
-            mode = Operation.APPEND.name if append else Operation.PREPEND.name
-            self.parameters[mode]['input1_reverse'] = reverse1
-            self.parameters[mode]['input2_reverse'] = reverse2
-            self.parameters[mode]['output_path'] = os.path.split(output_file)[0]
+        mode = Operation.APPEND.name if append else Operation.PREPEND.name
+        self.parameters[mode]['input1_reverse'] = reverse1
+        self.parameters[mode]['input2_reverse'] = reverse2
+        self.parameters[mode]['output_path'] = os.path.split(output_file)[0]
 
 
     def do_split(self, output_dir):
@@ -623,9 +614,8 @@ class Application():
             output_dir,
             reverse=reverse)
 
-        if self.update_params:
-            self.parameters[Operation.SPLIT.name]['input1_reverse'] = reverse
-            self.parameters[Operation.SPLIT.name]['output_path'] = output_dir
+        self.parameters[Operation.SPLIT.name]['input1_reverse'] = reverse
+        self.parameters[Operation.SPLIT.name]['output_path'] = output_dir
 
 
     def do_combine(self, input_files, output_file):
@@ -637,11 +627,10 @@ class Application():
             output_file,
             reverse=reverse)
 
-        if self.update_params:
-            base_dir = os.path.split(input_files[0])[0]
-            self.parameters[Operation.DIR_COMBINE.name]['input1'] = base_dir
-            self.parameters[Operation.DIR_COMBINE.name]['input1_reverse'] = reverse
-            self.parameters[Operation.DIR_COMBINE.name]['output_path'] = os.path.split(output_file)[0]
+        base_dir = os.path.split(input_files[0])[0]
+        self.parameters[Operation.DIR_COMBINE.name]['input1'] = base_dir
+        self.parameters[Operation.DIR_COMBINE.name]['input1_reverse'] = reverse
+        self.parameters[Operation.DIR_COMBINE.name]['output_path'] = os.path.split(output_file)[0]
 
 
     def do_delete(self, output_file):
@@ -653,8 +642,7 @@ class Application():
             output_file,
             pages=pages)
 
-        if self.update_params:
-            self.parameters[Operation.PAGE_DELETE.name]['output_path'] = os.path.split(output_file)[0]
+        self.parameters[Operation.PAGE_DELETE.name]['output_path'] = os.path.split(output_file)[0]
 
 
     def do_rotate(self, output_file):
@@ -670,8 +658,7 @@ class Application():
             angle=angle,
             pages=pages)
 
-        if self.update_params:
-            self.parameters[Operation.PAGE_ROTATE.name]['output_path'] = os.path.split(output_file)[0]
+        self.parameters[Operation.PAGE_ROTATE.name]['output_path'] = os.path.split(output_file)[0]
 
 
     def process_pdf(self):
@@ -754,16 +741,10 @@ class Application():
             tkinter.messagebox.showwarning(title='Pdf Multi Tool', message=message)
 
 
-#def report_callback_exception(self, exc, val, tb):
-#    tkinter.messagebox.showerror("Error", message=str(val))
-
-
 if __name__ == "__main__":
     root = tkinterdnd2.Tk()
     root.geometry("500x500")
     root.wm_resizable(True, True)
-
-    #tk.Tk.report_callback_exception = report_callback_exception
 
     app = Application(root)
     root.mainloop()
