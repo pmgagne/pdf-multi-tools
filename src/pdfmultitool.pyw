@@ -110,36 +110,40 @@ def dict_shape(d):
         return None
 
 
-class Application(ttk.Frame):
-    _APPNAME = "PdfMultiTool.701AF8AD-8CDD-45CE-B139-C7168052DEDA"
+class Application():
+    _APPNAME = "PDF MultiTool"
+    _APPID = "PdfMultiTool.701AF8AD-8CDD-45CE-B139-C7168052DEDA"
     _APPAUTHOR = "Philippe Gagne"
-    _CONFIGPATH = appdirs.user_data_dir(_APPNAME, _APPAUTHOR)
+    _CONFIGPATH = appdirs.user_data_dir(_APPID, _APPAUTHOR)
     _CONFIGFILE = os.path.join(_CONFIGPATH, "config.yml")
 
 
-    def __init__(self, master=None):
-        super().__init__(master)
-        self.pack(expand=1, fill='both')
-        self.master.title('PdfMultiTool')
-        
+    def __init__(self, root):
+        root.title(Application._APPNAME)
+        self.mainframe = ttk.Frame(root, padding="3 3 12 12")
+        self.mainframe.pack(expand=1, fill='both')
+        self.mainframe.grid(column=0, row=0, sticky=(tk.N, tk.W, tk.E, tk.S))
+        root.columnconfigure(0, weight=1)
+        root.rowconfigure(0, weight=1)
+
         # Not resizeable.
-        ttk.Sizegrip().pack(side='right')
+        #ttk.Sizegrip().pack(side='right')
 
         self.last_inputfile1 = ""
         self.last_inputfile2 = ""
 
         self.input1_filename = tk.StringVar()
-        self.input1_reverse = tk.IntVar()
+        self.input1_reverse = tk.BooleanVar()
         self.input1_page_range = tk.StringVar()
         self.input1_argument = tk.DoubleVar()
 
         self.input2_filename = tk.StringVar()
-        self.input2_reverse = tk.IntVar()
+        self.input2_reverse = tk.BooleanVar()
 
         self.mode = None
         self.mode_selection = tk.IntVar()
-        self.confirm_output = tk.IntVar()
-        self.update_params = tk.IntVar()
+        self.confirm_output = tk.BooleanVar()
+        self.update_params = tk.BooleanVar()
 
         # Each mode has a different set of parameters.
         self.create_parameters()
@@ -149,15 +153,15 @@ class Application(ttk.Frame):
         self.create_widgets()
         self.mode_selection.set(Operation.ZIP.value)
         self.gui_mode_switch(mode=Operation.ZIP)
-        master.protocol("WM_DELETE_WINDOW", self.on_closing)
-        self.after_idle(self.gui_update)
+        root.protocol("WM_DELETE_WINDOW", self.on_closing)
+        self.mainframe.after_idle(self.gui_update)
 
 
     def on_closing(self):
         """Save state then quit."""
         self.load_params_from_gui()
         self.write_params()
-        self.master.destroy()
+        self.mainframe.master.destroy()
 
 
     def create_parameters(self):
@@ -333,15 +337,15 @@ class Application(ttk.Frame):
     def create_widgets(self):
 
         # Input file 1
-        self.lf1 = ttk.LabelFrame(self, text='File 1:', padding=(12,6))
+        self.lf1 = ttk.LabelFrame(self.mainframe, text='File 1:', padding=(12,6), border=3)
         self.lf1.grid(row=0, column=0, sticky=tk.EW, padx=6, pady=6)
-        self.lf1.grid_columnconfigure(0, minsize=100, weight=1)
+        self.lf1.grid_columnconfigure(1, weight=1)
 
         filename = ttk.Entry(
             master=self.lf1, 
             text="Input File 1", 
             textvariable=self.input1_filename)
-        filename.grid(row=0, column=0, sticky=tk.EW)
+        filename.grid(row=0, column=0, columnspan=4, sticky=tk.EW)
         filename.drop_target_register(tkinterdnd2.DND_FILES, tkinterdnd2.DND_TEXT)
         filename.dnd_bind('<<Drop>>', lambda event: self.drop(event, self.input1_filename))
 
@@ -349,7 +353,7 @@ class Application(ttk.Frame):
             master=self.lf1, 
             text="\N{Horizontal Ellipsis}", # aka "..."
             command=lambda:self.prompt_for_input_file(self.input1_filename) )
-        filename_chooser.grid(row=0, column=1)
+        filename_chooser.grid(row=0, column=4, stick=tk.E)
 
         self.input1_reverse_checkbox = ttk.Checkbutton(
             master=self.lf1, 
@@ -357,37 +361,32 @@ class Application(ttk.Frame):
             variable=self.input1_reverse)
         self.input1_reverse_checkbox.grid(row=1, column=0, sticky=tk.W)
 
-        argument_frame = tk.Frame(master=self.lf1)
-        argument_frame.grid(row=2, column=0, sticky=tk.W)
-
-        l1 = ttk.Label(argument_frame, text="Pages: ")
-        l1.grid(row=0, column=0, sticky=tk.W)
+        ttk.Label(master=self.lf1, text="Pages:").grid(row=2, column=0, sticky=tk.W)
 
         self.page_range1 = ttk.Entry(
-            master=argument_frame,
+            master=self.lf1,
             text="",
             textvariable=self.input1_page_range)
-        self.page_range1.grid(row=0, column=1, sticky=tk.W)
+        self.page_range1.grid(row=2, column=1, sticky=tk.EW)
 
-        l2 = ttk.Label(argument_frame, text="  Argument: ")
-        l2.grid(row=0, column=2, sticky=tk.W)
+        ttk.Label(master=self.lf1, text="Argument:").grid(row=2, column=2, sticky=tk.W)
 
         self.argument1 = ttk.Entry(
-            master=argument_frame,
+            master=self.lf1,
             text="",
             textvariable=self.input1_argument)
-        self.argument1.grid(row=0, column=3, sticky=tk.W)
+        self.argument1.grid(row=2, column=3, sticky=tk.W)
 
         # Input file 2
-        self.lf2 = ttk.LabelFrame(self, text='File 2:', padding=(12,6))
+        self.lf2 = ttk.LabelFrame(self.mainframe, text='File 2:', padding=(12,6))
         self.lf2.grid(row=1, column=0, sticky=tk.EW, padx=6, pady=6)
-        self.lf2.grid_columnconfigure(0, minsize=100, weight=1)
+        self.lf2.grid_columnconfigure(1, weight=1)
 
         filename = ttk.Entry(
             master=self.lf2, 
             text="Input File 2", 
             textvariable=self.input2_filename)
-        filename.grid(row=0, column=0, sticky=tk.EW)
+        filename.grid(row=0, column=0, columnspan=4, sticky=tk.EW)
         filename.drop_target_register(tkinterdnd2.DND_FILES, tkinterdnd2.DND_TEXT)
         filename.dnd_bind('<<Drop>>', lambda event: self.drop(event, self.input2_filename))
         
@@ -395,7 +394,7 @@ class Application(ttk.Frame):
             master=self.lf2, 
             text="\N{Horizontal Ellipsis}", # aka "..."
             command=lambda:self.prompt_for_input_file(self.input2_filename) )
-        filename_chooser.grid(row=0, column=1)
+        filename_chooser.grid(row=0, column=4, stick=tk.E)
 
         input2_reverse = ttk.Checkbutton(
             master=self.lf2, 
@@ -404,7 +403,7 @@ class Application(ttk.Frame):
         input2_reverse.grid(row=1, column=0, sticky=tk.W)
 
         # Output file
-        lf3 = ttk.LabelFrame(self, text='Operation:', padding=(12,6))
+        lf3 = ttk.LabelFrame(self.mainframe, text='Operation:', padding=(12,6))
         lf3.grid(row=3, column=0, sticky=tk.EW, padx=6, pady=6)
         
         ttk.Radiobutton(
@@ -466,7 +465,7 @@ class Application(ttk.Frame):
             command=self.save_and_open_config)
         self.open_config_btn.grid(row=3, column=1, sticky=tk.S)
 
-        lf4 = ttk.Frame(self)
+        lf4 = ttk.Frame(self.mainframe)
         lf4.grid(row=3, column=0, sticky=tk.S+tk.EW, padx=12, pady=12)
         lf4.columnconfigure(6, weight=1)
         
@@ -483,9 +482,9 @@ class Application(ttk.Frame):
         self.quit_btn.grid(row=0, column=6, sticky=tk.SE)
 
         # Container grid final adjustments
-        self.grid_columnconfigure(0, weight=1)
+        self.mainframe.grid_columnconfigure(0, weight=1)
         # We make this last row resizeable to accomodate the layout.
-        self.rowconfigure(3, weight=1)
+        self.mainframe .rowconfigure(3, weight=1)
 
 
     def drop(self, event, variable):
@@ -521,13 +520,13 @@ class Application(ttk.Frame):
 
         if dir_select:
             filename = tk.filedialog.askdirectory(
-                master=self,
+                master=self.mainframe,
                 title='Input Directory',
                 initialdir=initial_dir
             )
         else:
             filename = tk.filedialog.askopenfilename(
-                master=self,
+                master=self.mainframe,
                 title='Input File',
                 filetypes = (('PDF files', '*.pdf'), ('All Files', '*.*')),
                 initialdir=initial_dir,
@@ -546,7 +545,7 @@ class Application(ttk.Frame):
 
         if not output_is_dir:
             output_path = tk.filedialog.asksaveasfilename(
-                master=self,
+                master=self.mainframe,
                 title='Output File',
                 defaultextension='.pdf',
                 filetypes = (('PDF files', '*.pdf'),),
@@ -555,7 +554,7 @@ class Application(ttk.Frame):
             )
         else:
             output_path = tk.filedialog.askdirectory(
-                master=self,
+                master=self.mainframe,
                 title='Output Directory',
                 initialdir=initial_dir,
             )
@@ -755,8 +754,8 @@ class Application(ttk.Frame):
             tkinter.messagebox.showwarning(title='Pdf Multi Tool', message=message)
 
 
-def report_callback_exception(self, exc, val, tb):
-    tkinter.messagebox.showerror("Error", message=str(val))
+#def report_callback_exception(self, exc, val, tb):
+#    tkinter.messagebox.showerror("Error", message=str(val))
 
 
 if __name__ == "__main__":
@@ -766,5 +765,5 @@ if __name__ == "__main__":
 
     #tk.Tk.report_callback_exception = report_callback_exception
 
-    app = Application(master=root)
-    app.mainloop()
+    app = Application(root)
+    root.mainloop()
