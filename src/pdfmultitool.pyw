@@ -136,9 +136,8 @@ class Application(ttk.Frame):
         self.input2_filename = tk.StringVar()
         self.input2_reverse = tk.IntVar()
 
-        self.mode = Operation.ZIP
+        self.mode = None
         self.mode_selection = tk.IntVar()
-        self.mode_selection.set(self.mode.value)
         self.confirm_output = tk.IntVar()
         self.update_params = tk.IntVar()
 
@@ -147,15 +146,18 @@ class Application(ttk.Frame):
         self.read_params()
         self.write_params()
 
-        self.create_widgets()  
+        self.create_widgets()
+        self.mode_selection.set(Operation.ZIP.value)
         self.gui_mode_switch(mode=Operation.ZIP)
         master.protocol("WM_DELETE_WINDOW", self.on_closing)
         self.after_idle(self.gui_update)
 
 
     def on_closing(self):
-        print("saving.")
+        """Save state then quit."""
+        self.load_params_from_gui()
         self.write_params()
+        self.master.destroy()
 
 
     def create_parameters(self):
@@ -197,17 +199,13 @@ class Application(ttk.Frame):
 
         parameters[Operation.DIR_COMBINE.name]['input1'] = ""
         parameters[Operation.DIR_COMBINE.name]['input1_reverse'] = False
-        parameters[Operation.DIR_COMBINE.name]['input2_reverse'] = False
         parameters[Operation.DIR_COMBINE.name]['output_path'] = ""
 
         parameters[Operation.PAGE_DELETE.name]['input1'] = ""
-        parameters[Operation.PAGE_DELETE.name]['input1_reverse'] = False
-        parameters[Operation.PAGE_DELETE.name]['input2_reverse'] = False
         parameters[Operation.PAGE_DELETE.name]['output_path'] = ""
 
         parameters[Operation.PAGE_ROTATE.name]['input1'] = ""
         parameters[Operation.PAGE_ROTATE.name]['input1_reverse'] = False
-        parameters[Operation.PAGE_ROTATE.name]['input2_reverse'] = False
         parameters[Operation.PAGE_ROTATE.name]['output_path'] = ""
 
         self.parameters = parameters
@@ -251,7 +249,9 @@ class Application(ttk.Frame):
         self.parameters['GENERAL']['constant_parameters'] = self.update_params.get() != 0
 
         self.parameters[self.mode.name]['input1'] = self.input1_filename.get()
-        self.parameters[self.mode.name]['input1_reverse'] = self.input1_reverse.get() != 0
+
+        if self.mode not in (Operation.PAGE_DELETE, Operation.PAGE_ROTATE):
+            self.parameters[self.mode.name]['input1_reverse'] = self.input1_reverse.get() != 0
 
         if self.mode in (Operation.ZIP, Operation.APPEND, Operation.PREPEND):
             self.parameters[self.mode.name]['input2'] = self.input2_filename.get()
@@ -263,7 +263,9 @@ class Application(ttk.Frame):
         self.update_params.set(self.parameters['GENERAL']['constant_parameters'])
 
         self.input1_filename.set(self.parameters[self.mode.name]['input1'])
-        self.input1_reverse.set(self.parameters[self.mode.name]['input1_reverse'])
+        
+        if self.mode not in (Operation.PAGE_DELETE, Operation.PAGE_ROTATE):
+            self.input1_reverse.set(self.parameters[self.mode.name]['input1_reverse'])
 
         if self.mode in (Operation.ZIP, Operation.APPEND, Operation.PREPEND):
             self.input2_filename.set(self.parameters[self.mode.name]['input2'])
@@ -477,7 +479,7 @@ class Application(ttk.Frame):
         self.quit_btn = ttk.Button(
             lf4,
             text="Quit",
-            command=self.master.destroy)
+            command=self.on_closing)
         self.quit_btn.grid(row=0, column=6, sticky=tk.SE)
 
         # Container grid final adjustments
@@ -544,6 +546,7 @@ class Application(ttk.Frame):
 
         if not output_is_dir:
             output_path = tk.filedialog.asksaveasfilename(
+                master=self,
                 title='Output File',
                 defaultextension='.pdf',
                 filetypes = (('PDF files', '*.pdf'),),
@@ -552,6 +555,7 @@ class Application(ttk.Frame):
             )
         else:
             output_path = tk.filedialog.askdirectory(
+                master=self,
                 title='Output Directory',
                 initialdir=initial_dir,
             )
@@ -569,7 +573,7 @@ class Application(ttk.Frame):
 
 
     def save_and_open_config(self):
-        self.write_params()
+        #self.write_params()
         self.open_file(Application._CONFIGFILE)
 
 
@@ -593,13 +597,13 @@ class Application(ttk.Frame):
 
     def do_append_prepend(self, output_file, append):
         """Do append or prepend."""
-        reverse1=self.input1_reverse.get() != 0
-        reverse2=self.input2_reverse.get() != 0
+        reverse1 = self.input1_reverse.get() != 0
+        reverse2 = self.input2_reverse.get() != 0
 
         pdfmanipulation.pdf_append(
             self.input1_filename.get(),
             self.input2_filename.get(),
-            output_path,
+            output_file,
             reverse1=self.input1_reverse.get() != 0,
             reverse2=self.input2_reverse.get() != 0,
             append=append)
@@ -611,45 +615,46 @@ class Application(ttk.Frame):
             self.parameters[mode]['output_path'] = os.path.split(output_file)[0]
 
 
-    def do_split(self, output_file):
-        # Do the actual split operation
+    def do_split(self, output_dir):
+        """Save individually each page of a file in the given folder."""
+        reverse = self.input1_reverse.get() != 0
+
         pdfmanipulation.pdf_split(
             self.input1_filename.get(),
-            output_path,
-            reverse=self.input1_reverse.get() != 0)
+            output_dir,
+            reverse=reverse)
 
         if self.update_params:
-            self.parameters[Operation.SPLIT.name]['input1_reverse'] = reverse1
-            self.parameters[Operation.SPLIT.name]['input2_reverse'] = reverse2
-            self.parameters[Operation.SPLIT.name]['output_path'] = os.path.split(output_file)[0]
+            self.parameters[Operation.SPLIT.name]['input1_reverse'] = reverse
+            self.parameters[Operation.SPLIT.name]['output_path'] = output_dir
 
 
     def do_combine(self, input_files, output_file):
+        """Combine all files in input_files to a single file."""
+        reverse = self.input1_reverse.get() != 0
+
         pdfmanipulation.pdf_merge_files(
             input_files,
-            output_path,
-            reverse=self.input1_reverse.get() != 0
-        )
+            output_file,
+            reverse=reverse)
 
         if self.update_params:
             base_dir = os.path.split(input_files[0])[0]
             self.parameters[Operation.DIR_COMBINE.name]['input1'] = base_dir
-            self.parameters[Operation.DIR_COMBINE.name]['input1_reverse'] = reverse1
-            self.parameters[Operation.DIR_COMBINE.name]['input2_reverse'] = reverse2
+            self.parameters[Operation.DIR_COMBINE.name]['input1_reverse'] = reverse
             self.parameters[Operation.DIR_COMBINE.name]['output_path'] = os.path.split(output_file)[0]
 
 
     def do_delete(self, output_file):
+        """Delete one or mor pages from a document."""
         pages = get_page_numbers(self.input1_page_range.get())
 
         pdfmanipulation.pdf_delete_page(
             self.input1_filename.get(),
-            output_path,
+            output_file,
             pages=pages)
 
         if self.update_params:
-            self.parameters[Operation.PAGE_DELETE.name]['input1_reverse'] = reverse1
-            self.parameters[Operation.PAGE_DELETE.name]['input2_reverse'] = reverse2
             self.parameters[Operation.PAGE_DELETE.name]['output_path'] = os.path.split(output_file)[0]
 
 
@@ -662,13 +667,11 @@ class Application(ttk.Frame):
 
         pdfmanipulation.pdf_rotate_page(
             self.input1_filename.get(),
-            output_path,
+            output_file,
             angle=angle,
             pages=pages)
 
         if self.update_params:
-            self.parameters[Operation.PAGE_ROTATE.name]['input1_reverse'] = reverse1
-            self.parameters[Operation.PAGE_ROTATE.name]['input2_reverse'] = reverse2
             self.parameters[Operation.PAGE_ROTATE.name]['output_path'] = os.path.split(output_file)[0]
 
 
@@ -698,16 +701,16 @@ class Application(ttk.Frame):
             ask_for_dir = self.mode == Operation.SPLIT
             output_path = self.prompt_for_output_path(
                 initial_path=last_outputfile,
-                output_is_dir=Fask_for_dir)
+                output_is_dir=ask_for_dir)
             if not output_path:
                 return
 
             if self.mode == Operation.ZIP:
                 self.do_zip(output_path)
             elif self.mode == Operation.APPEND:
-                self.do_append(output_path, append=True)
+                self.do_append_prepend(output_path, append=True)
             elif self.mode == Operation.PREPEND:
-                self.do_prepend(output_path, append=False)
+                self.do_append_prepend(output_path, append=False)
             elif self.mode == Operation.SPLIT:
                 # Call split in dry-run to only get output file names. Reverse is not important here.
                 output_files = pdfmanipulation.pdf_split(
@@ -727,13 +730,6 @@ class Application(ttk.Frame):
                 input_files = pdf_files_in_directory(self.input1_filename.get())
                 if not input_files:
                     tkinter.messagebox.showwarning(title='pdfmultitools', message='No PDF files found.')
-                    return
-
-                output_path = self.prompt_for_output_path(
-                    output_is_dir=False,
-                    initial_path=last_outputfile)
-
-                if not output_path:
                     return
 
                 self.do_combine(input_files, output_path)
@@ -765,7 +761,7 @@ def report_callback_exception(self, exc, val, tb):
 
 if __name__ == "__main__":
     root = tkinterdnd2.Tk()
-    root.geometry("500x400")
+    root.geometry("500x500")
     root.wm_resizable(True, True)
 
     #tk.Tk.report_callback_exception = report_callback_exception
